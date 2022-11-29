@@ -1,0 +1,1089 @@
+import io
+import shutil
+import random
+import sys
+import numpy as np
+import math
+import csv
+import heapq
+import os
+import glob
+import matplotlib.image as mpimg
+from time import time
+from time import process_time
+import pickle
+#from   itertools import combinations
+import datetime
+
+import tensorflow                    as     tf
+from   tensorflow                    import keras
+from   tensorflow.keras              import losses
+from   tensorflow.keras              import metrics
+from   tensorflow.keras.callbacks    import Callback, CSVLogger, EarlyStopping, ModelCheckpoint, TensorBoard
+from   tensorflow.keras.initializers import GlorotNormal, GlorotUniform, HeNormal
+from   tensorflow.keras.layers       import Dense, Dropout, Input
+from   tensorflow.keras.models       import load_model, Sequential
+from   tensorflow.keras.optimizers   import Adam
+
+
+def r2_distance(x1, x2, y1, y2):
+    return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+
+def r3_distance(x1, x2, y1, y2, z1, z2):
+    return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
+
+
+class Mde:
+    # https://rasterio.readthedocs.io/en/latest/quickstart.html
+    import rasterio
+
+    # Parametros:
+    # fp = nome do arquivo raster;
+    # reduction_factor = grau de redução da dimensão do mapa
+    def __init__(self, fp, reduction_factor):
+        self.dataset = self.rasterio.open(fp)
+        self.band1 = self.dataset.read(1)
+        self.pixel_resolution = self.dataset.transform[0]
+        self.h_limit = self.dataset.height
+        self.w_limit = self.dataset.width
+
+        # Redimensiona o grid
+        self.generate_grid(reduction_factor)
+
+        self.cell_size = self.pixel_resolution * reduction_factor
+        global CELL_HEIGHT, CELL_WIDTH, GRID_ROWS, GRID_COLS, GRID_HEIGHT, GRID_WIDTH
+        CELL_HEIGHT = self.pixel_resolution * reduction_factor
+        CELL_WIDTH = self.pixel_resolution * reduction_factor
+        GRID_COLS = self.grid.shape[0]
+        GRID_ROWS = self.grid.shape[1]
+        GRID_WIDTH = CELL_WIDTH * GRID_COLS
+        GRID_HEIGHT = CELL_HEIGHT * GRID_ROWS
+
+    # Gera o grid com dimensão reduzida
+    # Ex: reduction_factor = 2, mapa 400x400 reduzido para 200x200
+    def generate_grid(self, reduction_factor):
+        x = int(self.h_limit / reduction_factor)
+        y = int(self.w_limit / reduction_factor)
+        self.grid = np.zeros(shape=(x, y))
+        for i in range(x):
+            for j in range(y):
+                sub_section = self.band1[i * reduction_factor: (i + 1) * reduction_factor, j * reduction_factor: (j + 1) * reduction_factor]
+                self.grid[i, j] = np.sum(sub_section)
+                self.grid[i, j] = round(self.grid[i, j] / (len(sub_section) * len(sub_section[0])))
+
+    def get_cell_size(self):
+        return self.cell_size
+
+class Vertex:
+    def __init__(self, elevation, node_id):
+        self.local_risk = 0
+        self.elevation = elevation
+        self.id = node_id
+        self.edges = {}
+        self.distance = 99999999    # Somatório da distância percorrida da origem até o vértice
+        self.risk = 99999999    # Somatório do grau de visibilidade da origem até o vértice
+        self.previous = None
+        self.visited = False
+
+    def __str__(self):
+        return str(self.id) + ' elevation: ' + str(self.elevation) + ' coord: ' + str(self.get_r2_coordinates()) + ' edges: ' + str([x for x in self.edges.keys()]) + str([x for x in self.edges.values()])
+
+    def get_previous(self):
+        if self.previous is not None:
+            return self.previous
+        else:
+            return self
+
+    def add_edge(self, node_id, edge_weight):
+        self.edges[node_id] = edge_weight
+
+    def get_id(self):
+        return self.id
+
+    def get_neighbors(self):
+        return self.edges.keys()
+
+    def get_x(self):
+        return self.get_j() * CELL_WIDTH
+
+    def get_y(self):
+        return self.get_i() * CELL_HEIGHT
+
+    def get_i(self):
+        return math.floor(self.id / GRID_ROWS)
+
+    def get_j(self):
+        return self.id % GRID_COLS
+
+    def get_r2_coordinates(self):
+        return self.get_x(), self.get_y()
+
+    def get_r3_coordinates(self):
+        return self.get_x(), self.get_y(), self.elevation
+
+    def get_coordinates(self):
+        return self.get_i(), self.get_j()
+
+    def get_elevation(self):
+        return self.elevation
+
+    def get_edge_weight(self, vertex_id):
+        return self.edges[vertex_id]
+
+    def set_previous(self, prev):
+        self.previous = prev
+
+    def set_visited(self, visit):
+        self.visited = visit
+
+    def set_distance(self, distance):
+        self.distance = distance
+
+    def get_distance(self):
+        return self.distance
+
+    def set_risk(self, risk):
+        self.risk = risk
+
+    def get_risk(self):
+        return self.risk
+
+    # Reseta os valores do vértice para computar outro caminho utilizando o A*
+    def reset(self):
+        self.distance = 99999999
+        self.risk = 99999999
+        self.previous = None
+        self.visited = False
+
+    def set_local_risk(self, local_risk):
+        self.local_risk = local_risk
+
+    def get_local_risk(self):
+        return self.local_risk
+
+    def __lt__(self, other):
+        return self.distance + self.risk < other.distance + other.risk
+
+    def __eq__(self, other):
+        return self.id == other.get_id()
+
+class Graph:
+    def __init__(self, mde):
+        self.vertices = {}  # Dicionário de vértices: key = id, value = objeto Vertex
+        self.max_edge = 0.0
+        self.min_edge = float("inf")
+        self.create_vertices(mde)   # Popula o dicionário de vértices com 1 vértice para cada célula do grid do mde
+        self.generate_edges(False)  # Parâmetro: True = considera as travessias diagonais; False = considera apenas os vizinhos imediatos
+
+    def __iter__(self):
+        return iter(self.vertices.values())
+
+    # Método para resetar o grafo a cada busca
+    def reset(self):
+        for v in self:
+            v.reset()
+
+    def __str__(self):
+        for v in self:
+            print(v)
+
+    def create_vertices(self, mde):
+        for i in range(GRID_ROWS):
+            for j in range(GRID_COLS):
+                vertex_elevation = mde.grid[i, j]
+                vertex_id = i * GRID_COLS + j
+                self.add_vertex(vertex_elevation, vertex_id)
+
+    # Atribui o grau de visibilidade ao risco de cada vértice, baseado no parâmetro mapa de visibilidade "viewshed"
+    def update_vertices_risk(self, viewshed):
+        for v in self:
+            i,j = v.get_coordinates()
+            v.set_local_risk(viewshed[i,j])
+
+    def get_vertex(self, id):
+        if id in self.vertices:
+            return self.vertices[id]
+        else:
+            return None
+
+    def get_vertex_by_coords(self, i, j):
+        id = get_id_by_coords(i,j)
+        return self.get_vertex(id)
+
+    def get_vertices(self):
+        return self.vertices.keys()
+
+    def add_vertex(self, elevation, id):
+        self.vertices[id] = Vertex(elevation, id)
+    
+
+    def generate_edges(self, diagonal):
+        for vertex_id, vertex in self.vertices.items():
+            i, j = vertex.get_coordinates()
+
+            j1 = j + 1
+            i1 = i
+            if j1 < GRID_COLS:
+                vertex2_id = i1 * GRID_COLS + j1
+                vertex2 = self.get_vertex(vertex2_id)
+                if vertex2:
+                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),  # peso da aresta = distância Eclidiana no R3
+                                         vertex.get_elevation(), vertex2.get_elevation())
+                    if weight > self.max_edge:
+                        self.max_edge = weight
+                    if weight < self.min_edge:
+                        self.min_edge = weight
+                    vertex.add_edge(vertex2_id, weight)
+
+
+            j1 = j - 1
+            i1 = i
+            if j1 >= 0:
+                vertex2_id = i1 * GRID_COLS + j1
+                vertex2 = self.get_vertex(vertex2_id)
+                if vertex2:
+                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                           vertex.get_elevation(), vertex2.get_elevation())
+                    if weight > self.max_edge:
+                        self.max_edge = weight
+                    if weight < self.min_edge:
+                        self.min_edge = weight
+                    vertex.add_edge(vertex2_id, weight)
+
+
+            j1 = j
+            i1 = i + 1
+            if i1 < GRID_ROWS:
+                vertex2_id = i1 * GRID_COLS + j1
+                vertex2 = self.get_vertex(vertex2_id)
+                if vertex2:
+                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                           vertex.get_elevation(), vertex2.get_elevation())
+                    if weight > self.max_edge:
+                        self.max_edge = weight
+                    if weight < self.min_edge:
+                        self.min_edge = weight
+                    vertex.add_edge(vertex2_id, weight)
+
+            j1 = j
+            i1 = i - 1
+            if i1 >= 0:
+                vertex2_id = i1 * GRID_COLS + j1
+                vertex2 = self.get_vertex(vertex2_id)
+                if vertex2:
+                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                           vertex.get_elevation(), vertex2.get_elevation())
+                    if weight > self.max_edge:
+                        self.max_edge = weight
+                    if weight < self.min_edge:
+                        self.min_edge = weight
+                    vertex.add_edge(vertex2_id, weight)
+
+            if diagonal:
+                j1 = j + 1
+                i1 = i + 1
+                if j1 < GRID_COLS and i1 < GRID_ROWS:
+                    vertex2_id = i1 * GRID_COLS + j1
+                    vertex2 = self.get_vertex(vertex2_id)
+                    if vertex2:
+                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                             vertex.get_elevation(), vertex2.get_elevation())
+                        if weight > self.max_edge:
+                            self.max_edge = weight
+                        if weight < self.min_edge:
+                            self.min_edge = weight
+                        vertex.add_edge(vertex2_id, weight)
+
+                j1 = j - 1
+                i1 = i + 1
+                if j1 >= 0 and i1 < GRID_ROWS:
+                    vertex2_id = i1 * GRID_COLS + j1
+                    vertex2 = self.get_vertex(vertex2_id)
+                    if vertex2:
+                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                             vertex.get_elevation(), vertex2.get_elevation())
+                        if weight > self.max_edge:
+                            self.max_edge = weight
+                        if weight < self.min_edge:
+                            self.min_edge = weight
+                        vertex.add_edge(vertex2_id, weight)
+
+                j1 = j + 1
+                i1 = i - 1
+                if i1 >= 0 and j1 < GRID_COLS:
+                    vertex2_id = i1 * GRID_COLS + j1
+                    vertex2 = self.get_vertex(vertex2_id)
+                    if vertex2:
+                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                             vertex.get_elevation(), vertex2.get_elevation())
+                        if weight > self.max_edge:
+                            self.max_edge = weight
+                        if weight < self.min_edge:
+                            self.min_edge = weight
+                        vertex.add_edge(vertex2_id, weight)
+
+                j1 = j - 1
+                i1 = i - 1
+                if i1 >= 0 and j1 >= 0:
+                    vertex2_id = i1 * GRID_COLS + j1
+                    vertex2 = self.get_vertex(vertex2_id)
+                    if vertex2:
+                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
+                                             vertex.get_elevation(), vertex2.get_elevation())
+                        if weight > self.max_edge:
+                            self.max_edge = weight
+                        if weight < self.min_edge:
+                            self.min_edge = weight
+                        vertex.add_edge(vertex2_id, weight)
+
+    # Passa os valores de visbilidade [0, 1] para [0, max(edge) - min(edge)]
+    def normalize_visibility(self, visibility):
+        return visibility * (self.max_edge - self.min_edge)
+
+# Recupera o caminho percorrendo do fim para o inicio
+def shortest(v, path):
+    if v.previous:
+        path.append(v.previous.get_id())
+        shortest(v.previous, path)
+    return
+
+
+# Heuristica distancia Euclidiana no R3
+def r3_heuristic(start, goal):
+    x1, y1 = start.get_r2_coordinates()
+    x2, y2 = goal.get_r2_coordinates()
+    z1 = start.get_elevation()
+    z2 = goal.get_elevation()
+
+    dst = r3_distance(x1, x2, y1, y2, z1, z2)
+
+    return dst
+
+def heuristica_padrao(start,goal):
+    x1, y1 = start.get_coordinates()
+    x2, y2 = goal.get_coordinates()
+
+    return r2_distance(x1,x2,y1,y2)
+
+def line_of_sight(c_parent,c_child,grid):
+    x1, y1 = c_parent.get_coordinates()
+    x2, y2 = c_child.get_coordinates()
+
+    dy=y1 - y2
+    dx=x1 - x2
+    sy = 1
+    sx = 1
+    if dy < 0:
+        dy = -dy
+        sy=-1
+    if dx < 0:
+        dx = -dx
+        sx = -1
+
+        #define o erro do teste de colisao quanto maior o erro para um lado a linha vai pender para aquele lado
+    error_x = 2*dx
+    error_y = 2*dy
+
+    if  error_x>error_y:
+        r = (error_y-error_x)/2
+        x = x2
+        y = y2
+        e = 0
+        while x is not x1:
+            if e > r:
+                x = x + sx
+                e = e-error_y
+            elif e < r:
+                y = y + sy
+                e = e + error_x
+            else:
+                x = x + sx
+                y = y + sy
+                e = e + sx - sy
+            #if para verificar se esta bloqueado
+    else:
+        r = (error_y-error_x)/2
+        x = x2
+        y = y2
+        e = 0
+        while y is not y1:
+            if e > r:
+                y = y + sy
+                e = e-error_x
+            elif e < r:
+                x = x + sx
+                e = e + error_y
+            else:
+                x = x + sx
+                y = y + sy
+                e = e + sy - sx
+            #if para verificar se esta bloqueado
+    return True
+
+def line_of_sightNonUniform(c_parent,c_child,grid):
+    x1, y1 = c_parent.get_coordinates()
+    x2, y2 = c_child.get_coordinates()
+
+    dy=y1 - y2
+    dx=x1 - x2
+    sy = 1
+    sx = 1
+    if dy < 0:
+        dy = -dy
+        sy=-1
+    if dx < 0:
+        dx = -dx
+        sx = -1
+
+        #define o erro do teste de colisao quanto maior o erro para um lado a linha vai pender para aquele lado
+    error_x = 2*dx
+    error_y = 2*dy
+
+    cost = 0.0
+
+    if  error_x>error_y:
+        r = (error_y-error_x)/2
+        x = x2
+        y = y2
+        e = 0
+
+        cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
+
+        while x is not x1:
+            if e > r:
+                x = x + sx
+                e = e-error_y
+            elif e < r:
+                y = y + sy
+                e = e + error_x
+            else:
+                x = x + sx
+                y = y + sy
+                e = e + sx - sy
+            #if para verificar se esta bloqueado
+            cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
+        cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
+    else:
+        r = (error_y-error_x)/2
+        x = x2
+        y = y2
+        e = 0
+
+        cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
+
+        while y is not y1:
+            if e > r:
+                y = y + sy
+                e = e-error_x
+            elif e < r:
+                x = x + sx
+                e = e + error_y
+            else:
+                x = x + sx
+                y = y + sy
+                e = e + sy - sx
+            #if para verificar se esta bloqueado
+            cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
+        cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
+    return (True,cost)
+
+
+def CalculateCost(child,current,grid):
+    if line_of_sight(current.get_previous(), child, grid):
+        parent = current.get_previous()
+    else:
+        parent = current
+    return (parent.get_elevation() + heuristica_padrao(parent,child), parent)
+
+def CalculateCostNonUniform(child,current,grid):
+    linha, cost = line_of_sightNonUniform(current,child,grid)
+    g1 = current.get_elevation() + cost
+    linha, cost = line_of_sightNonUniform(current.get_previous(),child,grid)
+    g2 = current.get_previous().get_elevation() + cost
+
+
+    if linha and g2 <= g1:
+        parent = current.get_previous()
+        cost = g2
+    else:
+        parent = current
+        cost = g1
+    return (cost , parent)
+
+
+# A* adaptado com fator de segurança no cálculo do custo
+def safe_astar(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_elevation() + heuristic(start, goal)
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    opened.append(start.get_coordinates())
+    i=0
+    i+=1
+    while len(unvisited_queue):
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+
+        if current == goal:
+            distance = current.get_distance()
+            path =[]
+            while count_visited<len(opened):
+                #print("salvando o path\n")
+                path.append(current.get_coordinates())
+                count_visited = count_visited + 1
+                if current == start or current.get_previous() == current:
+                    break
+                else:
+                    current = current.get_previous()
+            return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, opened, path, distance
+
+        current.set_visited(True)
+        #visited.append(current.get_previous().get_coordinates())
+
+        for next_id in current.get_neighbors():
+            c_child = g.get_vertex(next_id)
+            #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
+    
+
+            new_risk = current.get_risk() + c_child.get_local_risk()
+            #line, cost = line_of_sightNonUniform(current,c_child,g)
+            #g_cost, parent = CalculateCostNonUniform(c_child,current,g)
+
+
+            cost, parent = CalculateCostNonUniform(c_child,current,g)
+
+            c_child = cost
+            c_child.set_previous(parent)
+
+            hscore = cost + heuristic(c_child, goal)
+            heapq.heappush(unvisited_queue, (hscore, c_child))
+            count_open = count_open + 1
+            opened.append(c_child.get_coordinates())
+
+
+            '''
+            g1 = current.get_elevation() + heuristica_padrao(current,c_child)
+            line= line_of_sight(current.get_previous(), c_child,g)
+            g2 = current.get_previous().get_elevation() + heuristica_padrao(current.get_previous(),c_child)
+
+            if line == True and g2<=g1:
+                #print("entrei")
+                c_child.set_previous(current.get_previous())
+                c_child.set_distance(g2)
+                hscore = g2 + heuristic(c_child, goal)
+                heapq.heappush(unvisited_queue, (hscore, c_child))
+                count_open = count_open + 1
+                opened.append(c_child.get_coordinates())
+            else:
+                c_child.set_distance(g1)
+                c_child.set_previous(current)
+
+                hscore = g1 + heuristic(c_child, goal)
+                heapq.heappush(unvisited_queue, (hscore, c_child))
+                count_open = count_open + 1
+                opened.append(c_child.get_coordinates())'''
+
+
+            '''if line_of_sight(current.get_previous(), child, g):
+                c_child.set_previous(current.get_previous())
+
+            else:
+                c_child.set_previous(current)
+                c_child.set_distance(g_cost)
+                c_child.set_risk(new_risk)'''
+
+                
+
+
+
+
+
+# A*
+def astar(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + heuristic(start, goal)
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    opened.append(start.get_coordinates())
+
+    while len(unvisited_queue):
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+
+        if current == goal:
+            distance = current.get_distance()
+            path =[]
+            while True:
+                count_visited = count_visited + 1
+                path.append(current.get_coordinates())
+                if current == start:
+                    break
+                else:
+                    current = current.get_previous()
+            return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, opened, path, distance
+
+        current.set_visited(True)
+        visited.append(current.get_previous().get_coordinates())
+
+        for next_id in current.get_neighbors():
+            next = g.get_vertex(next_id)
+            #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
+            new_dist = current.get_distance() + heuristica_padrao(current,next)
+
+            new_risk = current.get_risk() + next.get_local_risk()
+
+            if new_dist < next.get_distance():
+                next.set_previous(current)
+                next.set_distance(new_dist)
+                next.set_risk(new_risk)
+
+                
+
+                hscore = new_dist + heuristic(next, goal)
+
+                if not next.visited:
+                    heapq.heappush(unvisited_queue, (hscore, next))
+                    count_open = count_open + 1
+                    opened.append(next.get_coordinates())
+
+
+def get_visited_coord(graph, visited_vertices):
+    path = []
+    for vertex_id in visited_vertices[::-1]:
+        path.append(graph.get_vertex(vertex_id).get_coordinates())
+    return path
+
+
+# Recupera o id do vértice a partir das coordenadas no grid
+def get_id_by_coords(i, j):
+    return i * GRID_COLS + j
+
+
+def save_path_csv(output, path):
+    if os.path.exists(output):
+        os.remove(output)
+    with open(output, 'w') as out:
+        csv_out = csv.writer(out)
+        for row in path:
+            csv_out.writerow(row)
+
+
+def write_dataset_csv(filename, data_io):
+    with open(filename, 'a') as file:
+        data_io.seek(0)
+        shutil.copyfileobj(data_io, file)
+
+
+# Gera e salva os mapas de visibilidade em arquivos png
+def save_viewsheds(grid, viewpoints, view_radius, viewpoint_height):
+    todos = np.zeros((grid.shape[0], grid.shape[1]))
+    for viewpoint_i, viewpoint_j in viewpoints:
+        viewshed = vs.generate_viewshed(grid, viewpoint_i, viewpoint_j, view_radius, CELL_WIDTH, viewpoint_height)
+        todos = todos + viewshed
+        output_file = 'VIEWSHED_' + str(viewpoint_i) + '_' + str(viewpoint_j) + '.png'
+        vs.save_viewshed_image(viewshed, './VIEWSHEDS/' + output_file)
+    vs.save_viewshed_image(todos, './VIEWSHEDS/todos.png')
+
+
+# Lê o png do mapa de visibilidade
+def read_viewshed(file):
+    img = mpimg.imread(file)
+    viewshed = img[:, :, 0]
+    return viewshed
+
+
+import AUXILIARES.generate_viewshed as vs
+
+
+# Gera uma lista de tuplas de pontos de amostras para geração do dataset
+def generate_sample_points(sampling_percentage):
+    sections_n = 5
+    sections_m = 5
+
+    # Tamanho das divisões do mapa
+    SECTION_ROWS = GRID_ROWS // sections_n
+    SECTION_COLS = GRID_COLS // sections_m
+
+    # Conjunto de pontos amostrados, ordenados da esquerda pra direta, de cima pra baixo
+    P = []
+
+    # Itera pelas divisões do mapa, da esquerda pra direita, de cima pra baixo
+    for section_i in range(sections_n):
+        for section_j in range(sections_m):
+            section_points = []
+            for p_i in range(SECTION_ROWS * section_i, SECTION_ROWS * section_i + SECTION_ROWS):
+                for p_j in range(SECTION_COLS * section_j, SECTION_COLS * section_j + SECTION_COLS):
+                    section_points.append((p_i, p_j))
+            random.shuffle(section_points)
+            sampling_size = int(len(section_points) * sampling_percentage)
+            if sampling_size < 1:
+                sampling_size = 1
+            sample_points = section_points[0:sampling_size]
+            P.extend(sample_points)
+            section_points.clear()
+    P.sort(key=lambda tup: (tup[1], tup[0]))
+    return P
+
+
+# Mapa heurístico da DNN com 6 entradas
+def heuristic_dict1(g, model, goal):
+    todos_vertices = g.get_vertices()
+
+    dataset = []
+    t1_start = time()
+    for vertice_x in g:
+        vertice_y = goal
+
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    with tf.device('/gpu:0'):
+        predicoes = model.predict_on_batch(dataset)
+
+    dict_heuristica = dict(zip(todos_vertices, predicoes))
+
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
+
+# Mapa heurístico da DNN com 9 entradas
+def heuristic_dict2(g, model, observer, goal):
+    todos_vertices = g.get_vertices()
+
+    dataset = []
+    t1_start = time()
+    for vertice_x in g:
+        vertice_y = goal
+
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([observer[0], observer[1], observer[2], x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([observer[0], observer[1], observer[2], x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    with tf.device('/gpu:0'):
+        predicoes = model.predict_on_batch(dataset)
+
+    dict_heuristica = dict(zip(todos_vertices, predicoes))
+
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
+
+def dict_dnn_heuristic1(start, goal):
+    predicao = dnn_heuristic_dict1[start.get_id()][0]
+    return predicao
+
+
+def dict_dnn_heuristic2(start, goal):
+    predicao = dnn_heuristic_dict2[start.get_id()][0]
+    return predicao
+
+
+def dnn_predict(start, goal, model, observer):
+    (x1, y1, alt1) = start.get_r3_coordinates()  # current
+    (x2, y2, alt2) = goal.get_r3_coordinates()  # goal
+
+    # append array 2d
+    if x2 < x1 or (x2 == x1 and y2 < y1):
+        data = [observer[0], observer[1], observer[2], x2, y2, alt2, x1, y1, alt1]
+    else:
+        data = [observer[0], observer[1], observer[2], x1, y1, alt1, x2, y2, alt2]
+    return model.predict(np.array([data]))
+
+
+def observer_points(grid, n, m, r=10, spacing=4):  #divide o grid(n x m) em r x r regioes
+    nr = (n)/r
+    mr = (m)/r
+    pontos = []
+    for i in range(0,r): #0-9
+        for j in range(0,r): #0-9
+            regiao = np.array(grid[int(i * nr +spacing): int((i+1) * nr -spacing), int(j * mr +spacing) : int((j+1) * mr -spacing)])
+            min = np.argmin(regiao)
+            min = (min//regiao.shape[0] +spacing, min % regiao.shape[1]+spacing)
+            max = np.argmax(regiao)
+            max = (max//regiao.shape[0] +spacing, max % regiao.shape[1]+spacing)
+            if ((i + j) % 2) == 0:
+                min_coords = (int(i*nr + min[0]), int(j*mr + min[1]))
+                pontos.append(min_coords)
+            else:
+                max_coords = (int(i*nr + max[0]), int(j*mr + max[1]))
+                pontos.append(max_coords)
+    return pontos
+
+# Recupera o caminho percorrendo do fim para o inicio, contando os nodos visíveis
+def count_visible_nodes(v, path, count_visible):
+    if v.get_local_risk() > 0:
+        count_visible += 1
+
+    if v.previous:
+        path.append(v.previous.get_id())
+        count_visible = count_visible_nodes(v.previous, path, count_visible)
+
+    return count_visible
+
+
+def main():
+    args = sys.argv
+    filename = args[1] # recorte .tif do terreno
+    #model_name1 = args[2] # modelo 1 de DNN treinada (só para características topográficas)
+    #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+
+    reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
+
+    # Lê o arquivo do MDE e cria o grid do mapa
+    mde = Mde(filename, reduction_factor)
+
+    print('Criando o grafo')
+    # Cria o grafo a partir do grid do MDE
+    g = Graph(mde)
+
+    print('Gerando os viewsheds')
+    # Coordenadas de cada observador
+    # Gera as mesma coordenadas utilizadas na criação do dataset de treinamento
+    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
+
+    # Carrega os modelos das redes neurais treinadas
+    #model1 = load_model(model_name1)
+    #model2 = load_model(model_name2)
+
+    print('Iniciando')
+
+    # Quantidade de caminhos para cada observador (100 X 1000)
+    paths_per_map = 1000
+
+    start_time = time()
+
+    data_io_time_cost_r3 = io.StringIO()
+    data_io_visited_cost_r3 = io.StringIO()
+
+    data_io_visited = io.StringIO()
+    data_io_opened = io.StringIO()
+    data_io_visited2 = io.StringIO()
+    data_io_opened2 = io.StringIO()
+
+    data_io_time_cost_dnn1 = io.StringIO()
+    data_io_visited_cost_dnn1 = io.StringIO()
+    data_io_time_cost_dnn2 = io.StringIO()
+    data_io_visited_cost_dnn2 = io.StringIO()
+    data_io_comp = io.StringIO()
+    data_io_all = io.StringIO()
+
+    # cabecalho dos arquivos csv, separador utilizado é o ';'
+    data_io_time_cost_r3.write("""y;x\n""")
+    data_io_visited_cost_r3.write("""y;x\n""")
+
+    #data_io_visited.write("""y;x\n""")
+    #data_io_opened.write("""y;x\n""")
+
+    data_io_time_cost_dnn1.write("""y;x\n""")
+    data_io_visited_cost_dnn1.write("""y;x\n""")
+    data_io_time_cost_dnn2.write("""y;x\n""")
+    data_io_visited_cost_dnn2.write("""y;x\n""")
+    data_io_comp.write("""dist_a;vis_a;cost_a;dist_b;vis_b;cost_b;dist_c;vis_c;cost_c;dist_d;vis_d;cost_d;time_a;time_b;time_c;time_d;visited_a;visited_b;visited_c;visited_d;len_a;len_b;len_c;len_d;count_visible_a;count_visible_b;count_visible_c;count_visible_d\n""")
+    data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
+
+    if not os.path.exists("./DADOS_RESULTADOS/"):
+        os.makedirs("./DADOS_RESULTADOS/")
+
+    write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
+    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
+    write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
+    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
+    write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
+    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
+    write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
+    write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+    write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+    teste=True
+    # Realiza o mesmo processo para cada observador
+    print(len(viewpoints))
+    for vp in viewpoints:
+        observer = (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]])  # Coordenadas do observador
+
+        data_io_time_cost_r3 = io.StringIO()
+        data_io_visited_cost_r3 = io.StringIO()
+        data_io_time_cost_dnn1 = io.StringIO()
+        data_io_visited_cost_dnn1 = io.StringIO()
+        data_io_time_cost_dnn2 = io.StringIO()
+        data_io_visited_cost_dnn2 = io.StringIO()
+        data_io_comp = io.StringIO()
+        data_io_all = io.StringIO()
+
+        b = 0.5  # Fator de importância da segurança no cálculo do custo
+        visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
+
+        viewshed = read_viewshed(visibility_map_file)
+        viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
+
+        # Atribui a cada vértice o nível de visibilidade do viewshed
+        g.update_vertices_risk(viewshed)
+
+        # ------------------------------------------------------------ #
+        # Cria as combinações de pares de origem-destino
+        sampling_rate = 0.125
+        sample_coords = generate_sample_points(sampling_rate / 100)
+
+        aux = 0
+        combinations = []
+        for coords in sample_coords:
+            for coords2 in sample_coords[aux+1:]:
+                combinations.append([coords, coords2])
+            aux += 1
+
+        random.shuffle(combinations)
+        combinations = combinations[:paths_per_map]
+        # ----------------------------------------------------------- #
+        # Itera nos N pares de origem e destino
+        for pair in combinations:
+            src_coords = pair[0]
+            dest_coords = pair[1]
+            source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+            source = g.get_vertex(source_id)
+
+            dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
+            dest = g.get_vertex(dest_id)
+            global dnn_heuristic_dict1
+            global dnn_heuristic_dict2
+            #dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
+            #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model2, observer, dest)
+
+            #4 casos:
+            #1) A* simples, heurística padrao
+            heuristic = heuristica_padrao
+            t1 = time()
+            distance1, safety1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            path1 = [dest.get_id()]
+            count_visible1 = count_visible_nodes(dest, path1, 0)
+            path_len1 = len(path1)
+            t1 = time() - t1
+            #g.reset()
+
+            print("terminou A*")
+
+            #2)A* adaptado, heuristica r3
+            heuristic = heuristica_padrao
+            t2 = time()
+            distance2, safety2, count_visited2, count_open2, opened2, visited2, cost2 = safe_astar(g, source, dest, b, heuristic)
+            path2 = [dest.get_id()]
+            count_visible2 = count_visible_nodes(dest, path2, 0)
+            path_len2 = len(path2)
+            t2 = time() - t2
+            g.reset()
+
+            data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
+            data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
+            '''    
+            #3) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
+            heuristic = dict_dnn_heuristic1
+            t3 = time()
+            distance3, safety3, count_visited3, count_open3, opened3, visited3, cost3 = safe_astar(g, source, dest, b, heuristic)
+            path3 = [dest.get_id()]
+            count_visible3 = count_visible_nodes(dest, path3, 0)
+            path_len3 = len(path3)
+            t3 = time() - t3 + h_map_time1
+            g.reset()
+
+            data_io_time_cost_dnn1.write("""%s;%s\n""" % (t3, cost3))
+            data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited3, cost3))
+
+            #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
+            heuristic = dict_dnn_heuristic2
+            t4 = time()
+            distance4, safety4, count_visited4, count_open4, opened4, visited4, cost4 = safe_astar(g, source, dest, b,
+                                                                                                   heuristic)
+            path4 = [dest.get_id()]
+            count_visible4 = count_visible_nodes(dest, path4, 0)
+            path_len4 = len(path4)
+            t4 = time() - t4 + h_map_time2
+            g.reset()'''
+
+            #data_io_time_cost_dnn2.write("""%s;%s\n""" % (t4, cost4))
+            #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
+
+            data_io_comp.write("""%s;%s;%s;%s;%s;%s;%s\n""" %(distance1,safety1,cost1,t1,count_visited1,path_len1,count_visible1))
+
+            if teste:
+                teste=False
+                for i in range(len(opened1)):
+                    data_io_opened.write("""%s\n"""%str((opened1[i])))
+                for i in range(len(visited1)):
+                    data_io_visited.write("""%s\n"""%str((visited1[i])))
+
+                write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+                write_dataset_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
+                
+                for i in range(len(opened2)):
+                    data_io_opened.write("""%s\n"""%str((opened2[i])))
+                for i in range(len(visited2)):
+                    data_io_visited.write("""%s\n"""%str((visited2[i])))
+
+                write_dataset_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
+                write_dataset_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
+                break
+
+
+            
+
+            #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
+            #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
+
+        #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
+       # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
+        #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
+        #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
+        #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
+        #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
+        write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
+        #write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+
+        print('Tempo: ' + str(time() - start_time) + ' segundos')
+        break
+
+if __name__ == '__main__':
+    main()
