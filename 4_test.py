@@ -422,6 +422,7 @@ def line_of_sight(c_parent,c_child,grid):
     return True
 
 def line_of_sightNonUniform(c_parent,c_child,grid):
+    
     x1, y1 = c_parent.get_coordinates()
     x2, y2 = c_child.get_coordinates()
 
@@ -462,6 +463,7 @@ def line_of_sightNonUniform(c_parent,c_child,grid):
                 y = y + sy
                 e = e + sx - sy
             #if para verificar se esta bloqueado
+            
             cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
         cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
     else:
@@ -488,6 +490,86 @@ def line_of_sightNonUniform(c_parent,c_child,grid):
         cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
     return (True,cost)
 
+def calcula_angulo(vertex1,vertex2,g):
+    #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
+    distancia = vertex2.get_edge_weight(vertex1)
+    altura = abs(vertex2.get_elevation()-vertex1.get_elevation())
+    hipotenusa = math.sqrt(distancia**2+altura**2)
+    seno = altura/hipotenusa
+    return math.sin(seno)*180/math.pi
+    
+def calcula_hipotenusa(vertex1,vertex2,g):
+    #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
+    distancia = vertex2.get_edge_weight(vertex1)
+    altura = abs(vertex2.get_elevation()-vertex1.get_elevation())
+    hipotenusa = math.sqrt(distancia**2+altura**2)    
+    return hipotenusa
+
+
+def line_of_sight1(s,s1,g):#original
+    x0,y0 = s.get_coordinates()
+    x1,y1 = s1.get_coordinates()
+    dy=y1 - y0
+    dx=x1 - x0
+    sy = 1
+    sx = 1
+    if dy < 0:
+        dy = -dy
+        sy=-1
+    if dx < 0:
+        dx = -dx
+        sx = -1
+    cost = 0
+    f=0
+    w=0
+    
+    anguloMAX=30
+    
+    #definir uma variavel que vai definir se o desnivel é muito grande ou nao
+    
+    #edge cost é calculado na lineofsight
+    # cost padrão é calculado usando pitagoras entre a distancia e a altura
+    
+    if dx >= dy:
+        #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
+        while x0 != x1:
+            f = f + dy
+            #x_i_vertex = x0 + int((sx-1)/2)
+            #y_j_vertex = y0 + int((sy-1)/2)
+            cost = cost + g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)).get_edge_weight(x0,y0)
+            if f>= dx:
+                if calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                    return False
+                y0 = y0 + sy
+                f = f - dx
+
+            if f!=0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+                return False
+            if dy==0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0),g.get_vertex_by_coords(x0,y0))<anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 - 1),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+                return False
+            #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
+            x0 = x0 + sx
+    else:
+        #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
+        while y0 != y1:
+            f = f + dx
+            #x0 + int((sx-1)/2) = x0 + int((sx-1)/2)
+            #y0 + int((sy-1)/2) = y0 + int((sy-1)/2)
+            cost = cost + g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)).get_edge_weight(x0,y0)
+            if f >= dy:
+                if calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+                    return False
+                
+                x0 = x0 + sx
+                f = f - dy
+
+            if f != 0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+                return False
+            if dx == 0 and calcula_angulo(g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+                return False
+            y0 = y0 + sy
+            #cost = cost + (g.get_vertex(get_id_by_coords(x_i_vertex,y_j_vertex)).get_elevation()/2)
+    return True, cost
 
 def CalculateCost(child,current,grid):
     if line_of_sight(current.get_previous(), child, grid):
@@ -497,10 +579,14 @@ def CalculateCost(child,current,grid):
     return (parent.get_elevation() + heuristica_padrao(parent,child), parent)
 
 def CalculateCostNonUniform(child,current,grid):
-    linha, cost = line_of_sightNonUniform(current,child,grid)
-    g1 = current.get_elevation() + cost
-    linha, cost = line_of_sightNonUniform(current.get_previous(),child,grid)
-    g2 = current.get_previous().get_elevation() + cost
+
+    g1 = current.get_distance() + calcula_hipotenusa(current,child)
+    linha, cost = line_of_sight1(current.get_previous(),child,grid)
+    
+    altura = abs(current.get_previous().get_elevation()-child.get_elevation())
+    hipotenusa = math.sqrt(cost**2+altura**2)    
+    
+    g2 = current.get_previous().get_elevation() + hipotenusa
 
 
     if linha and g2 <= g1:
@@ -568,7 +654,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
             cost, parent = CalculateCostNonUniform(c_child,current,g)
 
-            c_child = cost
+            c_child.set_distance(cost)
             c_child.set_previous(parent)
 
             hscore = cost + heuristic(c_child, goal)
@@ -658,7 +744,7 @@ def astar(g, start, goal, v_weight, heuristic):
         for next_id in current.get_neighbors():
             next = g.get_vertex(next_id)
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
-            new_dist = current.get_distance() + heuristica_padrao(current,next)
+            new_dist = current.get_distance() + current.get_edge_weight(next)
 
             new_risk = current.get_risk() + next.get_local_risk()
 
