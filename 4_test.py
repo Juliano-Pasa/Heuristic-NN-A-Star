@@ -94,6 +94,9 @@ class Vertex:
 
     def add_edge(self, node_id, edge_weight):
         self.edges[node_id] = edge_weight
+        
+    def get_visited(self):
+        return self.visited
 
     def has_parent(self):
         if (self.previous):
@@ -495,12 +498,11 @@ def line_of_sightNonUniform(c_parent,c_child,grid):
         cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
     return (True,cost)
 
-def calcula_angulo(vertex1,vertex2):
+def calcula_angulo(vert,vert1):
     #if vertex1.get_id()==vertex2.get_id()
     #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
-    distancia = vertex2.get_edge_weight(vertex1.get_id())
-    altura = abs(vertex2.get_elevation()-vertex1.get_elevation())
-    hipotenusa = math.sqrt(distancia**2+altura**2)
+    altura = abs(vert.get_elevation()-vert1.get_elevation())
+    hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
     seno = altura/hipotenusa
     return math.sin(seno)*180/math.pi
     
@@ -531,12 +533,15 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
-    anguloMAX=30
+    anguloMAX=45
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
     #edge cost é calculado na lineofsight
     # cost padrão é calculado usando pitagoras entre a distancia e a altura
+    
+    #                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),  # peso da aresta = distância Eclidiana no R3
+    #                                     vertex.get_elevation(), vertex2.get_elevation())
     
     if dx >= dy:
         #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
@@ -545,20 +550,26 @@ def line_of_sight1(s,s1,g):#original
             #x_i_vertex = x0 + int((sx-1)/2)
             #y_j_vertex = y0 + int((sy-1)/2)
             
+            vert = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+            #print("aaaaa vertex1 550",vert)
+            vert1 = g.get_vertex_by_coords(x0,y0)
+            #print("aaaaa vertex2 550",vert1)
+            #print("vert1 e 2 peso", vert.get_edge_weight(vert1.get_id()))
+            
             idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
-                if calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                if calcula_angulo(vert,vert1)>anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     return False, math.inf
                 y0 = y0 + sy
                 f = f - dx
 
-            if f!=0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+            if f!=0 and calcula_angulo(vert,vert1)>anguloMAX:
                 return False,math.inf
-            if dy==0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0),g.get_vertex_by_coords(x0,y0))<anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+            if dy==0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0),vert1)>anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1),vert1)>anguloMAX:
                 return False,math.inf
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
-            cost = cost + g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)).get_edge_weight(idinicial)
+            #cost = cost + g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)).get_edge_weight(idinicial)
     else:
         #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
         while y0 != y1:
@@ -566,25 +577,32 @@ def line_of_sight1(s,s1,g):#original
             idinicial=get_id_by_coords(x0,y0)
             #x0 + int((sx-1)/2) = x0 + int((sx-1)/2)
             #y0 + int((sy-1)/2) = y0 + int((sy-1)/2)
+            vert = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+            #print("aaaaa vertex1 550",vert)
+            vert1 = g.get_vertex_by_coords(x0,y0)
             if f >= dy:
-                if calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)),g.get_vertex(idinicial))<anguloMAX:
+                vert = g.get_vertex_by_coords(x0,y0)
+                print("aaaaa vertex",vert)
+                if calcula_angulo(vert,vert1)>anguloMAX:
                     return False,math.inf
                 
                 x0 = x0 + sx
                 f = f - dy
 
-            if f != 0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+            if f != 0 and calcula_angulo(vert,vert1)>anguloMAX:
                 return False,math.inf
-            if dx == 0 and calcula_angulo(g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)),g.get_vertex_by_coords(x0,y0))<anguloMAX:
+            
+            
+            if dx == 0 and calcula_angulo(g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)),vert1)>anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)),vert1)>anguloMAX:
+                vert = g.get_vertex_by_coords(x0,y0)
+                print("aaaaa vertex",vert)
                 return False,math.inf
             y0 = y0 + sy
             print("AAAAAAAAAAAAAAAAAA ",x0 + int((sx-1)/2),y0 + int((sy-1)/2))
             print("cords",x0,y0)
-            vert = g.get_vertex_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))
-            print("aaaaa vertex",vert)
             print("aaaaaaaaaa",g.get_vertex(idinicial))
             #print("aaa",vert.get_edge_weight(28237))
-            cost = cost + vert.get_edge_weight(idinicial)
+            #cost = cost + vert.get_edge_weight(idinicial)
             #cost = cost + (g.get_vertex(get_id_by_coords(x_i_vertex,y_j_vertex)).get_elevation()/2)
     return True, cost
 
@@ -679,6 +697,8 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
         for next_id in current.get_neighbors():
             c_child = g.get_vertex(next_id)
+            if c_child.get_visited():        
+                continue
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
     
 
@@ -688,22 +708,22 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
 
             cost, parent = CalculateCostNonUniform(c_child,current,g)
-            print(current.get_previous())
-            print(current)
-            print(c_child)
-            print("\n")
+            #print(current.get_previous())
+            #print(current)
+            #print(c_child)
+            #print("\n")
             c_child.set_distance(cost)
             c_child.set_previous(parent)
             
             
 
             hscore = cost + heuristic(c_child, goal)
-            
-        
+            print("alguma cosia")
             unvisited_queue.append((hscore, c_child))
             count_open = count_open + 1
             opened.append(c_child.get_coordinates())
-            print("lista",unvisited_queue)
+            
+            #print("lista",unvisited_queue)
 
 
             '''
