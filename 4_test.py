@@ -27,11 +27,11 @@ from   tensorflow.keras.optimizers   import Adam
 
 
 def r2_distance(x1, x2, y1, y2):
-    return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+    return np.sqrt(((x1 - x2) ** 2) + ((y1 - y2) ** 2))
 
 
 def r3_distance(x1, x2, y1, y2, z1, z2):
-    return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
+    return np.sqrt((r2_distance(x1,x2,y1,y2) ** 2) + ((z1 - z2) ** 2))
 
 
 class Mde:
@@ -550,22 +550,22 @@ def line_of_sight1(s,s1,g):#original
             #x_i_vertex = x0 + int((sx-1)/2)
             #y_j_vertex = y0 + int((sy-1)/2)
             
-            vert = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+            vert_src = g.get_vertex_by_coords(x0,y0)
+            vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
             #print("aaaaa vertex1 550",vert)
-            vert1 = g.get_vertex_by_coords(x0,y0)
             #print("aaaaa vertex2 550",vert1)
             #print("vert1 e 2 peso", vert.get_edge_weight(vert1.get_id()))
             
             idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
-                if calcula_angulo(vert,vert1)>anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                if calcula_angulo(vert_src,vert_tgt)<anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     return False, math.inf
                 y0 = y0 + sy
                 f = f - dx
 
-            if f!=0 and calcula_angulo(vert,vert1)>anguloMAX:
+            if f!=0 and calcula_angulo(vert_src, vert_tgt)<anguloMAX:
                 return False,math.inf
-            if dy==0 and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0),vert1)>anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1),vert1)>anguloMAX:
+            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))<anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))<anguloMAX:
                 return False,math.inf
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
@@ -577,23 +577,23 @@ def line_of_sight1(s,s1,g):#original
             idinicial=get_id_by_coords(x0,y0)
             #x0 + int((sx-1)/2) = x0 + int((sx-1)/2)
             #y0 + int((sy-1)/2) = y0 + int((sy-1)/2)
-            vert = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+            vert_src = g.get_vertex_by_coords(x0,y0)
+            vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
             #print("aaaaa vertex1 550",vert)
-            vert1 = g.get_vertex_by_coords(x0,y0)
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
                 print("aaaaa vertex",vert)
-                if calcula_angulo(vert,vert1)>anguloMAX:
+                if calcula_angulo(vert_src,vert_tgt)<anguloMAX:
                     return False,math.inf
                 
                 x0 = x0 + sx
                 f = f - dy
 
-            if f != 0 and calcula_angulo(vert,vert1)>anguloMAX:
+            if f != 0 and calcula_angulo(vert_src,vert_tgt)<anguloMAX:
                 return False,math.inf
             
             
-            if dx == 0 and calcula_angulo(g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)),vert1)>anguloMAX and calcula_angulo(g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)),vert1)>anguloMAX:
+            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))<anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))<anguloMAX:
                 vert = g.get_vertex_by_coords(x0,y0)
                 print("aaaaa vertex",vert)
                 return False,math.inf
@@ -642,6 +642,7 @@ def CalculateCostNonUniform(child,current,grid):
 # A* adaptado com fator de segurança no cálculo do custo
 def safe_astar(g, start, goal, v_weight, heuristic):
     opened = []
+    closed = []
     visited = []
 
     visibility_weight = v_weight
@@ -652,9 +653,9 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
     # Calcula custo = w * risco + distancia + heursítica_r3
     # Calcula custo = w * risco + distancia + heursítica_r3
-    hscore = start.get_elevation() + heuristic(start, goal)
+    hscore = start.get_distance() + r3_heuristic(start, goal)
 
-    unvisited_queue = [(hscore, start)]
+    opened = [(start, hscore)]
     #heapq.heapify(unvisited_queue)
 
     count_visited = 0
@@ -662,66 +663,66 @@ def safe_astar(g, start, goal, v_weight, heuristic):
     
     print("chegada",goal)
 
-    opened.append(start.get_coordinates())
+    #opened.append(start.get_coordinates())
     i=0
     i+=1
     best=math.inf
-    while len(unvisited_queue):
-        for i in range(len(unvisited_queue)):
-            x,y = unvisited_queue[i]
-            if x<best:
-                best=x
+    while len(opened):
+        best=math.inf
+        for i in range(len(opened)):
+            x,y = opened[i]
+            if y<best:
+                best=y
                 save=i
                 
-        
-        uv = unvisited_queue[save]
-        current = uv[1]
-        del unvisited_queue[save]
-        best=math.inf
+        uv = opened[save]
+        current = uv[0]
+        del opened[save]
 
         if current == goal:
+            #Backtracking - Verificar
             distance = current.get_distance()
             path =[]
-            while count_visited<len(opened):
-                #print("salvando o path\n")
+            count_visited=0
+            print("salvando o path\n")
+            while current.get_id() != start.get_id():
+                
                 path.append(current.get_coordinates())
-                count_visited = count_visited + 1
-                if current == start or current.get_previous() == current:
-                    break
-                else:
-                    current = current.get_previous()
+                current = current.get_previous()
             return current.get_distance(), count_visited, count_open, opened, path, distance
 
-        current.set_visited(True)
+        current.set_visited(True) #Precisa?
+        visited.append(current)
         #visited.append(current.get_previous().get_coordinates())
-
+        print(current.get_neighbors())
         for next_id in current.get_neighbors():
-            c_child = g.get_vertex(next_id)
-            if c_child.get_visited():        
-                continue
-            #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
-    
+            print(next_id)
+            print("Vraunelas")
+            child = g.get_vertex(next_id)
+            print(child.get_visited())
+            if child not in visited:
+                print("Vasco")
+                if child in opened:
+                        child.set_distance(math.inf)
+                        child.set_previous(None)
 
-            new_risk = current.get_risk() + c_child.get_local_risk()
-            #line, cost = line_of_sightNonUniform(current,c_child,g)
-            #g_cost, parent = CalculateCostNonUniform(c_child,current,g)
+                grand_father = current.get_previous()
 
-
-            cost, parent = CalculateCostNonUniform(c_child,current,g)
-            #print(current.get_previous())
-            #print(current)
-            #print(c_child)
-            #print("\n")
-            c_child.set_distance(cost)
-            c_child.set_previous(parent)
-            
-            
-
-            hscore = cost + heuristic(c_child, goal)
-            print("alguma cosia")
-            unvisited_queue.append((hscore, c_child))
-            count_open = count_open + 1
-            opened.append(c_child.get_coordinates())
+                if not (grand_father is None) and line_of_sight1(grand_father, child, g):
+                    if grand_father.get_distance() + r3_heuristic(grand_father, child) < child.get_distance():
+                        child.set_distance(grand_father.get_distance() + r3_heuristic(grand_father, child))
+                        child.set_previous(grand_father)
+                        if child in opened:
+                            opened.remove(child) # verificar
+                        opened.append(child, child.get_distance() + r3_heuristic(child, goal)) # verificar
+                else:
+                    if current.get_distance() + r3_heuristic(current, child) < child.get_distance():
+                        child.set_distance(current.get_distance() + r3_heuristic(current, child))#substituir por edge cost? precisa deixar coerente.
+                        child.set_previous(current)
+                        if (child, _) in opened:
+                            opened.remove((child, _)) # verificar
+                        opened.append(child, child.get_distance() + r3_heuristic(child, goal)) # verificar
+                
             
             #print("lista",unvisited_queue)
 
@@ -760,7 +761,22 @@ def safe_astar(g, start, goal, v_weight, heuristic):
                 
 
 
-
+def update_vertex(parent, child):
+    grand_father = parent.get_previous()
+    if line_of_sight1(grand_father, child):
+        if grand_father.get_distance() + r3_distance(grand_father, child) < child.get_distance():
+            child.set_distance(grand_father.get_distance() + r3_distance(grand_father, child))
+            child.set_previous(grand_father)
+            if child in opened:
+                opened.remove(child) # verificar
+            opened.append(child, child.get_distance() + heuristic(child, goal)) # verificar
+    else:
+        if parent.get_distance() + r3_distance(parent, child) < child.get_distance():
+            child.set_distance(parent.get_distance() + r3_distance(parent, child))#substituir por edge cost? precisa deixar coerente.
+            child.set_previous(parent)
+            if (child, _) in opened:
+                opened.remove((child, _)) # verificar
+            opened.append(child, child.get_distance() + heuristic(child, goal)) # verificar
 
 
 # A*
