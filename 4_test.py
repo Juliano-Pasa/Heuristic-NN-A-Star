@@ -66,8 +66,8 @@ class Mde:
         x = int(self.h_limit / reduction_factor)
         y = int(self.w_limit / reduction_factor)
         self.grid = np.zeros(shape=(x, y))
-        for i in range(x):
-            for j in range(y):
+        for j in range(x):
+            for i in range(y):
                 sub_section = self.band1[i * reduction_factor: (i + 1) * reduction_factor, j * reduction_factor: (j + 1) * reduction_factor]
                 self.grid[i, j] = np.sum(sub_section)
                 self.grid[i, j] = round(self.grid[i, j] / (len(sub_section) * len(sub_section[0])))
@@ -137,6 +137,8 @@ class Vertex:
     def get_edge_weight(self, vertex_id):
         if self.get_id() == vertex_id:
             return math.inf
+        if (self.edges[vertex_id] is None):
+            return None
         return self.edges[vertex_id]
 
     def set_previous(self, prev):
@@ -533,7 +535,7 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
-    anguloMAX=45
+    anguloMAX=30
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
@@ -558,14 +560,14 @@ def line_of_sight1(s,s1,g):#original
             
             idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
-                if calcula_angulo(vert_src,vert_tgt)<anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                if calcula_angulo(vert_src,vert_tgt)>anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     return False, math.inf
                 y0 = y0 + sy
                 f = f - dx
 
-            if f!=0 and calcula_angulo(vert_src, vert_tgt)<anguloMAX:
+            if f!=0 and calcula_angulo(vert_src, vert_tgt)>anguloMAX:
                 return False,math.inf
-            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))<anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))<anguloMAX:
+            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>anguloMAX:
                 return False,math.inf
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
@@ -583,17 +585,17 @@ def line_of_sight1(s,s1,g):#original
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
                 print("aaaaa vertex",vert)
-                if calcula_angulo(vert_src,vert_tgt)<anguloMAX:
+                if calcula_angulo(vert_src,vert_tgt)>anguloMAX:
                     return False,math.inf
                 
                 x0 = x0 + sx
                 f = f - dy
 
-            if f != 0 and calcula_angulo(vert_src,vert_tgt)<anguloMAX:
+            if f != 0 and calcula_angulo(vert_src,vert_tgt)>anguloMAX:
                 return False,math.inf
             
             
-            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))<anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))<anguloMAX:
+            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>anguloMAX:
                 vert = g.get_vertex_by_coords(x0,y0)
                 print("aaaaa vertex",vert)
                 return False,math.inf
@@ -678,50 +680,75 @@ def safe_astar(g, start, goal, v_weight, heuristic):
         uv = opened[save]
         current = uv[0]
         del opened[save]
+        visited.append(current)
 
         if current == goal:
             #Backtracking - Verificar
             distance = current.get_distance()
-            path =[]
+            path = []
             count_visited=0
             print("salvando o path\n")
             while current.get_id() != start.get_id():
                 
                 path.append(current.get_coordinates())
                 current = current.get_previous()
-            return current.get_distance(), count_visited, count_open, opened, path, distance
-
+            
+            #path = list(map(lambda v: v.get_coordinates(), visited))
+            opened_nodes = list(map(lambda v: v.get_coordinates(), visited))
+            #print("Distance: ", current.get_distance(), "\nOpened: ", opened_nodes, "\nPath: ", path) #Alterar nomenclatura para adequar com o resultado almejado
+            return current.get_distance(), count_visited, count_open, opened_nodes, path, distance
+            
         current.set_visited(True) #Precisa?
-        visited.append(current)
         #visited.append(current.get_previous().get_coordinates())
         print(current.get_neighbors())
         for next_id in current.get_neighbors():
-            print(next_id)
-            print("Vraunelas")
             child = g.get_vertex(next_id)
-            print(child.get_visited())
-            if child not in visited:
-                print("Vasco")
-                if child in opened:
-                        child.set_distance(math.inf)
-                        child.set_previous(None)
+            if child not in visited:               
+                
+                ind = 0
+                newborn = True
+                for ind in range(len(opened)):
+                    c, hs = opened[ind]
+                    if(c == child): 
+                        newborn = False
+
+                if newborn:
+                    child.set_distance(math.inf)
+                    child.set_previous(None)
 
                 grand_father = current.get_previous()
-
-                if not (grand_father is None) and line_of_sight1(grand_father, child, g):
+                if grand_father is not None and line_of_sight1(grand_father, child, g):
                     if grand_father.get_distance() + r3_heuristic(grand_father, child) < child.get_distance():
                         child.set_distance(grand_father.get_distance() + r3_heuristic(grand_father, child))
                         child.set_previous(grand_father)
-                        if child in opened:
-                            opened.remove(child) # verificar
-                        opened.append(child, child.get_distance() + r3_heuristic(child, goal)) # verificar
+                        
+                        #Ineficiente, refatorar com alguma built-in function
+                        ind = 0
+                        for ind in range(len(opened)):
+                            c, hs = opened[ind]
+                            if child == c:                            
+                                del opened[ind]
+                                break
+
+                        opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
                 else:
+                    print("Falsou!")
                     if current.get_distance() + r3_heuristic(current, child) < child.get_distance():
                         child.set_distance(current.get_distance() + r3_heuristic(current, child))#substituir por edge cost? precisa deixar coerente.
                         child.set_previous(current)
-                        if (child, _) in opened:
-                            opened.remove((child, _)) # verificar
-                        opened.append(child, child.get_distance() + r3_heuristic(child, goal)) # verificar
+                        if(current.get_edge_weight(child.get_id()) is None):
+                            print("Ele não é o pai!!!")
+                            break
+
+                        #Ineficiente, refatorar com alguma built-in function
+                        ind = 0
+                        for ind in range(len(opened)):
+                            c, hs = opened[ind]
+                            if child == c:                            
+                                del opened[ind]
+                                break
+
+                        opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
                 
             
             #print("lista",unvisited_queue)
@@ -1077,6 +1104,7 @@ def main():
     data_io_time_cost_dnn2 = io.StringIO()
     data_io_visited_cost_dnn2 = io.StringIO()
     data_io_comp = io.StringIO()
+    data_io_comp2 = io.StringIO()
     data_io_all = io.StringIO()
 
     # cabecalho dos arquivos csv, separador utilizado é o ';'
@@ -1091,6 +1119,7 @@ def main():
     data_io_time_cost_dnn2.write("""y;x\n""")
     data_io_visited_cost_dnn2.write("""y;x\n""")
     data_io_comp.write("""dist_a;vis_a;cost_a;dist_b;vis_b;cost_b;dist_c;vis_c;cost_c;dist_d;vis_d;cost_d;time_a;time_b;time_c;time_d;visited_a;visited_b;visited_c;visited_d;len_a;len_b;len_c;len_d;count_visible_a;count_visible_b;count_visible_c;count_visible_d\n""")
+    data_io_comp2.write("""dist_a;vis_a;cost_a;dist_b;vis_b;cost_b;dist_c;vis_c;cost_c;dist_d;vis_d;cost_d;time_a;time_b;time_c;time_d;visited_a;visited_b;visited_c;visited_d;len_a;len_b;len_c;len_d;count_visible_a;count_visible_b;count_visible_c;count_visible_d\n""")
     data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
     if not os.path.exists("./DADOS_RESULTADOS/"):
@@ -1102,7 +1131,7 @@ def main():
     write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
     write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
     write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
-    write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
+    write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)#Talvez 2
     write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
     write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
     teste=True
@@ -1118,6 +1147,7 @@ def main():
         data_io_time_cost_dnn2 = io.StringIO()
         data_io_visited_cost_dnn2 = io.StringIO()
         data_io_comp = io.StringIO()
+        data_io_comp2 = io.StringIO()
         data_io_all = io.StringIO()
 
         b = 0.5  # Fator de importância da segurança no cálculo do custo
@@ -1174,7 +1204,10 @@ def main():
             #2)A* adaptado, heuristica r3
             heuristic = heuristica_padrao
             t2 = time()
+            
             distance2, count_visited2, count_open2, opened2, visited2, cost2 = safe_astar(g, source, dest, b, heuristic)
+            print("tá astralado: ", visited1)
+            print("que thetão hein: ", visited2)
             path2 = [dest.get_id()]
             count_visible2 = count_visible_nodes(dest, path2, 0)
             path_len2 = len(path2)
@@ -1212,6 +1245,7 @@ def main():
             #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
 
             data_io_comp.write("""%s;%s;%s;%s;%s;%s;%s\n""" %(distance1,safety1,cost1,t1,count_visited1,path_len1,count_visible1))
+            data_io_comp2.write("""%s;%s;%s;%s;%s;%s\n""" %(distance2,cost2,t2,count_visited2,path_len2,count_visible2))
 
             if teste:
                 teste=False
@@ -1224,9 +1258,9 @@ def main():
                 write_dataset_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
                 
                 for i in range(len(opened2)):
-                    data_io_opened.write("""%s\n"""%str((opened2[i])))
+                    data_io_opened2.write("""%s\n"""%str((opened2[i])))
                 for i in range(len(visited2)):
-                    data_io_visited.write("""%s\n"""%str((visited2[i])))
+                    data_io_visited2.write("""%s\n"""%str((visited2[i])))
 
                 write_dataset_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
                 write_dataset_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
