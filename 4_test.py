@@ -501,12 +501,18 @@ def line_of_sightNonUniform(c_parent,c_child,grid):
     return (True,cost)
 
 def calcula_angulo(vert,vert1):
+    if vert is None or vert1 is None:
+        return math.inf
+    if vert == vert1:
+        return math.inf
     #if vertex1.get_id()==vertex2.get_id()
     #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
     altura = abs(vert.get_elevation()-vert1.get_elevation())
     hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
     seno = altura/hipotenusa
-    return math.sin(seno)*180/math.pi
+    print("hipotenusa: ", hipotenusa)
+    print("lalala seno: ",math.degrees(math.sin(seno)))
+    return math.degrees(math.sin(seno))
     
 def calcula_hipotenusa(vertex1,vertex2,g):
     #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
@@ -518,9 +524,9 @@ def calcula_hipotenusa(vertex1,vertex2,g):
 
 def line_of_sight1(s,s1,g):#original
     x0,y0 = s.get_coordinates()
-    print(x0,y0)
+    #print(x0,y0)
     x1,y1 = s1.get_coordinates()
-    print(x1,y1)
+    #print(x1,y1)
     dy=y1 - y0
     dx=x1 - x0
     sy = 1
@@ -535,7 +541,7 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
-    anguloMAX=30
+    anguloMAX=25
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
@@ -561,14 +567,15 @@ def line_of_sight1(s,s1,g):#original
             idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
                 if calcula_angulo(vert_src,vert_tgt)>anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
-                    return False, math.inf
+                    #print("ENTREI AQUI")
+                    return False
                 y0 = y0 + sy
                 f = f - dx
 
             if f!=0 and calcula_angulo(vert_src, vert_tgt)>anguloMAX:
-                return False,math.inf
+                return False
             if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>anguloMAX:
-                return False,math.inf
+                return False
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
             #cost = cost + g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)).get_edge_weight(idinicial)
@@ -584,25 +591,25 @@ def line_of_sight1(s,s1,g):#original
             #print("aaaaa vertex1 550",vert)
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
-                print("aaaaa vertex",vert)
+                #print("aaaaa vertex",vert)
                 if calcula_angulo(vert_src,vert_tgt)>anguloMAX:
-                    return False,math.inf
+                    return False
                 
                 x0 = x0 + sx
                 f = f - dy
 
             if f != 0 and calcula_angulo(vert_src,vert_tgt)>anguloMAX:
-                return False,math.inf
+                return False
             
             
             if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>anguloMAX:
                 vert = g.get_vertex_by_coords(x0,y0)
-                print("aaaaa vertex",vert)
-                return False,math.inf
+                #print("aaaaa vertex",vert)
+                return False
             y0 = y0 + sy
-            print("AAAAAAAAAAAAAAAAAA ",x0 + int((sx-1)/2),y0 + int((sy-1)/2))
-            print("cords",x0,y0)
-            print("aaaaaaaaaa",g.get_vertex(idinicial))
+            #print("AAAAAAAAAAAAAAAAAA ",x0 + int((sx-1)/2),y0 + int((sy-1)/2))
+            #print("cords",x0,y0)
+            #print("aaaaaaaaaa",g.get_vertex(idinicial))
             #print("aaa",vert.get_edge_weight(28237))
             #cost = cost + vert.get_edge_weight(idinicial)
             #cost = cost + (g.get_vertex(get_id_by_coords(x_i_vertex,y_j_vertex)).get_elevation()/2)
@@ -663,7 +670,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
     count_visited = 0
     count_open = 1
     
-    print("chegada",goal)
+    #print("chegada",goal)
 
     #opened.append(start.get_coordinates())
     i=0
@@ -689,7 +696,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
             count_visited=0
             print("salvando o path\n")
             while current.get_id() != start.get_id():
-                
+                print("nodo :", current)
                 path.append(current.get_coordinates())
                 current = current.get_previous()
             
@@ -700,7 +707,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
             
         current.set_visited(True) #Precisa?
         #visited.append(current.get_previous().get_coordinates())
-        print(current.get_neighbors())
+        #print(current.get_neighbors())
         for next_id in current.get_neighbors():
             child = g.get_vertex(next_id)
             if child not in visited:               
@@ -732,7 +739,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
                         opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
                 else:
-                    print("Falsou!")
+                    #print("Falsou!")
                     if current.get_distance() + r3_heuristic(current, child) < child.get_distance():
                         child.set_distance(current.get_distance() + r3_heuristic(current, child))#substituir por edge cost? precisa deixar coerente.
                         child.set_previous(current)
