@@ -651,8 +651,7 @@ def CalculateCostNonUniform(child,current,grid):
 # A* adaptado com fator de segurança no cálculo do custo
 def safe_astar(g, start, goal, v_weight, heuristic):
     opened = []
-    closed = []
-    visited = []
+    expanded = []
 
     visibility_weight = v_weight
 
@@ -661,18 +660,13 @@ def safe_astar(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    # Calcula custo = w * risco + distancia + heursítica_r3
     hscore = start.get_distance() + r3_heuristic(start, goal)
 
     opened = [(start, hscore)]
-    #heapq.heapify(unvisited_queue)
 
     count_visited = 0
     count_open = 1
     
-    #print("chegada",goal)
-
-    #opened.append(start.get_coordinates())
     i=0
     i+=1
     best=math.inf
@@ -687,30 +681,23 @@ def safe_astar(g, start, goal, v_weight, heuristic):
         uv = opened[save]
         current = uv[0]
         del opened[save]
-        visited.append(current)
+        expanded.append(current)
 
         if current == goal:
-            #Backtracking - Verificar
             distance = current.get_distance()
             path = []
-            count_visited=0
+            count_visited=0 #trocar
             print("salvando o path\n")
             while current.get_id() != start.get_id():
-                print("nodo :", current)
                 path.append(current.get_coordinates())
                 current = current.get_previous()
             
-            #path = list(map(lambda v: v.get_coordinates(), visited))
-            opened_nodes = list(map(lambda v: v.get_coordinates(), visited))
-            #print("Distance: ", current.get_distance(), "\nOpened: ", opened_nodes, "\nPath: ", path) #Alterar nomenclatura para adequar com o resultado almejado
-            return current.get_distance(), count_visited, count_open, opened_nodes, path, distance
+            closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
+            return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
             
-        current.set_visited(True) #Precisa?
-        #visited.append(current.get_previous().get_coordinates())
-        #print(current.get_neighbors())
         for next_id in current.get_neighbors():
             child = g.get_vertex(next_id)
-            if child not in visited:               
+            if child not in expanded:               
                 
                 ind = 0
                 newborn = True
@@ -739,13 +726,9 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 
                         opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
                 else:
-                    #print("Falsou!")
                     if current.get_distance() + r3_heuristic(current, child) < child.get_distance():
                         child.set_distance(current.get_distance() + r3_heuristic(current, child))#substituir por edge cost? precisa deixar coerente.
                         child.set_previous(current)
-                        if(current.get_edge_weight(child.get_id()) is None):
-                            print("Ele não é o pai!!!")
-                            break
 
                         #Ineficiente, refatorar com alguma built-in function
                         ind = 0
