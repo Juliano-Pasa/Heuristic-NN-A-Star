@@ -371,8 +371,8 @@ def r3_heuristic(start, goal):
     return dst
 
 def heuristica_padrao(start,goal):
-    x1, y1 = start.get_coordinates()
-    x2, y2 = goal.get_coordinates()
+    x1, y1 = start.get_r2_coordinates()
+    x2, y2 = goal.get_r2_coordinates()
 
     return r2_distance(x1,x2,y1,y2)
 
@@ -510,8 +510,8 @@ def calcula_angulo(vert,vert1):
     altura = abs(vert.get_elevation()-vert1.get_elevation())
     hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
     seno = altura/hipotenusa
-    print("hipotenusa: ", hipotenusa)
-    print("lalala seno: ",math.degrees(math.sin(seno)))
+    #print("hipotenusa: ", hipotenusa)
+    #print("lalala seno: ",math.degrees(math.sin(seno)))
     return math.degrees(math.sin(seno))
     
 def calcula_hipotenusa(vertex1,vertex2,g):
@@ -677,7 +677,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
             if y<best:
                 best=y
                 save=i
-                
+                    
         uv = opened[save]
         current = uv[0]
         del opened[save]
@@ -686,7 +686,8 @@ def safe_astar(g, start, goal, v_weight, heuristic):
         if current == goal:
             distance = current.get_distance()
             path = []
-            count_visited=0 #trocar
+            path.append(goal.get_coordinates())
+            count_visited=0
             print("salvando o path\n")
             while current.get_id() != start.get_id():
                 path.append(current.get_coordinates())
@@ -799,7 +800,7 @@ def update_vertex(parent, child):
 # A*
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
-    visited = []
+    expanded = [] #visitados e abertos
 
     visibility_weight = v_weight
 
@@ -810,31 +811,42 @@ def astar(g, start, goal, v_weight, heuristic):
     # Calcula custo = w * risco + distancia + heursítica_r3
     hscore = start.get_distance() + heuristic(start, goal)
 
-    unvisited_queue = [(hscore, start)]
-    heapq.heapify(unvisited_queue)
+    opened = [(start, hscore)]
+    
 
     count_visited = 0
     count_open = 1
-
-    opened.append(start.get_coordinates())
-
-    while len(unvisited_queue):
-        uv = heapq.heappop(unvisited_queue)
-        current = uv[1]
+    i=0
+    i+=1
+    #opened.append(start.get_coordinates())
+    best = math.inf
+    while len(opened):
+        best=math.inf
+        for i in range(len(opened)):
+            x,y = opened[i]
+            if y<best:
+                best=y
+                save=i
+                
+        uv = opened[save]
+        current = uv[0]
+        del opened[save]
+        expanded.append(current)
 
         if current == goal:
             distance = current.get_distance()
-            path =[]
-            while True:
-                count_visited = count_visited + 1
+            path = []
+            path.append(goal.get_coordinates())
+            count_visited=0
+            print("salvando o path\n")
+            while current.get_id() != start.get_id():
                 path.append(current.get_coordinates())
-                if current == start:
-                    break
-                else:
-                    current = current.get_previous()
-            return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, opened, path, distance
+                current = current.get_previous()
+            
+            closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
+            return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, closed_nodes, path, distance
 
-        current.set_visited(True)
+        #current.set_visited(True)
         #visited.append(current.get_previous().get_coordinates())
 
         for next_id in current.get_neighbors():
@@ -853,10 +865,10 @@ def astar(g, start, goal, v_weight, heuristic):
 
                 hscore = new_dist + heuristic(next, goal)
 
-                if not next.visited:
-                    heapq.heappush(unvisited_queue, (hscore, next))
+                if next not in expanded:
+                    opened.append((next, hscore))
                     count_open = count_open + 1
-                    opened.append(next.get_coordinates())
+                    #opened.append(next.get_coordinates())
 
 
 def get_visited_coord(graph, visited_vertices):
@@ -881,7 +893,7 @@ def save_path_csv(output, path):
 
 
 def write_dataset_csv(filename, data_io):
-    with open(filename, 'a') as file:
+    with open(filename, 'w') as file:
         data_io.seek(0)
         shutil.copyfileobj(data_io, file)
 
@@ -1180,14 +1192,14 @@ def main():
 
             #4 casos:
             #1) A* simples, heurística padrao
-            heuristic = heuristica_padrao
+            heuristic = r3_heuristic
             t1 = time()
             distance1, safety1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
             path1 = [dest.get_id()]
             count_visible1 = count_visible_nodes(dest, path1, 0)
             path_len1 = len(path1)
             t1 = time() - t1
-            #g.reset()
+            g.reset()
 
             print("terminou A*")
 

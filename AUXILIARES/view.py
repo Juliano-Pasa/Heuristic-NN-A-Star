@@ -113,7 +113,7 @@ def draw_surface(file, projection, alt_diff):
     # ALTURA DAS COORDENADAS <- MDE (COLORAÇÃO DO PNG DO FILE)
     z = img[:, :, :-1] * alt_diff
 
-    visited = open_csv('../DADOS_RESULTADOS/opened2.csv')
+    visited = open_csv('../DADOS_RESULTADOS/opened.csv')
     viewshed = mpimg.imread(projection)
 
     # ------------------------ PLOT SUPERFICIE --------------------------- #
@@ -155,7 +155,7 @@ def draw_surface(file, projection, alt_diff):
 
     # ---------------------------------------- CAMINHO ---------------------------------------------------------- #
     # marca as coordenadas percorridas
-    path = open_csv('../DADOS_RESULTADOS/visited2.csv')
+    path = open_csv('../DADOS_RESULTADOS/visited.csv')
     # path = []
     # Pontos do caminho
     for i, cell in enumerate(path):
