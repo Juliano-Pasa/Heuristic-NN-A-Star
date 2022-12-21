@@ -692,7 +692,7 @@ def safe_astar(g, start, goal, v_weight, heuristic):
             while current.get_id() != start.get_id():
                 path.append(current.get_coordinates())
                 current = current.get_previous()
-            
+            path.append(current.get_coordinates())
             closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
             return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
             
@@ -842,7 +842,7 @@ def astar(g, start, goal, v_weight, heuristic):
             while current.get_id() != start.get_id():
                 path.append(current.get_coordinates())
                 current = current.get_previous()
-            
+            path.append(current.get_coordinates())
             closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
             return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, closed_nodes, path, distance
 
@@ -854,12 +854,12 @@ def astar(g, start, goal, v_weight, heuristic):
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
             new_dist = current.get_distance() + current.get_edge_weight(next.get_id())
 
-            new_risk = current.get_risk() + next.get_local_risk()
+            #new_risk = current.get_risk() + next.get_local_risk()
 
             if new_dist < next.get_distance():
                 next.set_previous(current)
                 next.set_distance(new_dist)
-                next.set_risk(new_risk)
+                #next.set_risk(new_risk)
 
                 
 
@@ -1192,7 +1192,7 @@ def main():
 
             #4 casos:
             #1) A* simples, heurística padrao
-            heuristic = r3_heuristic
+            heuristic = heuristica_padrao
             t1 = time()
             distance1, safety1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
             path1 = [dest.get_id()]

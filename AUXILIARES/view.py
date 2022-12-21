@@ -161,10 +161,10 @@ def draw_surface(file, projection, alt_diff):
     for i, cell in enumerate(path):
         if i == 0:
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='o', c='w', zorder=4.5, s=200)
-            ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='$S$', color='b', zorder=4.55, s=100)
+            ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='$G$', color='b', zorder=4.55, s=100)
         elif i == len(path) -1:
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='o', c='w', zorder=4.5, s=200)
-            ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='$G$', color='b', zorder=4.55, s=100)
+            ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='$S$', color='b', zorder=4.55, s=100)
         else:
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='o', c='c', zorder=4.49, s=10)
     # ----------------------------------------------------------------------------------------------------------- #
