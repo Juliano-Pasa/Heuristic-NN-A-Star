@@ -541,7 +541,7 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
-    anguloMAX=25
+    anguloMAX=10
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
@@ -852,7 +852,7 @@ def astar(g, start, goal, v_weight, heuristic):
         for next_id in current.get_neighbors():
             next = g.get_vertex(next_id)
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
-            new_dist = current.get_distance() + current.get_edge_weight(next.get_id())
+            new_dist = current.get_distance() + heuristic(current, next) 
 
             #new_risk = current.get_risk() + next.get_local_risk()
 
@@ -870,6 +870,77 @@ def astar(g, start, goal, v_weight, heuristic):
                     count_open = count_open + 1
                     #opened.append(next.get_coordinates())
 
+def astarmod(g, start, goal, v_weight, heuristic):
+    opened = []
+    expanded = [] #visitados e abertos
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + heuristic(start, goal)
+
+    opened = [(start, hscore)]
+    
+
+    count_visited = 0
+    count_open = 1
+    i=0
+    i+=1
+    #opened.append(start.get_coordinates())
+    best = math.inf
+    while len(opened):
+        best=math.inf
+        for i in range(len(opened)):
+            x,y = opened[i]
+            if y<best:
+                best=y
+                save=i
+                
+        uv = opened[save]
+        current = uv[0]
+        del opened[save]
+        expanded.append(current)
+
+        if current == goal:
+            distance = current.get_distance()
+            path = []
+            path.append(goal.get_coordinates())
+            count_visited=0
+            print("salvando o path\n")
+            while current.get_id() != start.get_id():
+                path.append(current.get_coordinates())
+                current = current.get_previous()
+            path.append(current.get_coordinates())
+            closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
+            return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
+
+        #current.set_visited(True)
+        #visited.append(current.get_previous().get_coordinates())
+
+        for next_id in current.get_neighbors():
+            next = g.get_vertex(next_id)
+            #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
+            new_dist = current.get_distance() + current.get_edge_weight(next_id)
+
+            #new_risk = current.get_risk() + next.get_local_risk()
+
+            if new_dist < next.get_distance():
+                next.set_previous(current)
+                next.set_distance(new_dist)
+                #next.set_risk(new_risk)
+
+                
+
+                hscore = new_dist + heuristic(next, goal)
+
+                if next not in expanded:
+                    opened.append((next, hscore))
+                    count_open = count_open + 1
+                    #opened.append(next.get_coordinates())
 
 def get_visited_coord(graph, visited_vertices):
     path = []
@@ -1178,8 +1249,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = pair[0]
-            dest_coords = pair[1]
+            src_coords = (63,27)#pair[0]
+            dest_coords = (156,130)#pair[1]
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
 
@@ -1196,9 +1267,13 @@ def main():
             t1 = time()
             distance1, safety1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
             path1 = [dest.get_id()]
+            print("custo do a*: ",cost1)
+            print("nodos visitados: ",len(visited1))
+            print("nodos abertos: ",len(opened1))
             count_visible1 = count_visible_nodes(dest, path1, 0)
             path_len1 = len(path1)
             t1 = time() - t1
+            print("tempo de duração: ", t1)
             g.reset()
 
             print("terminou A*")
@@ -1208,12 +1283,15 @@ def main():
             t2 = time()
             
             distance2, count_visited2, count_open2, opened2, visited2, cost2 = safe_astar(g, source, dest, b, heuristic)
-            print("tá astralado: ", visited1)
-            print("que thetão hein: ", visited2)
+            print("custo do theta: ",cost2)
+            print("nodos visitados: ",len(visited2))
+            print("nodos abertos: ",len(opened2))
+            
             path2 = [dest.get_id()]
             count_visible2 = count_visible_nodes(dest, path2, 0)
             path_len2 = len(path2)
             t2 = time() - t2
+            print("tempo de duração: ", t2)
             g.reset()
 
             data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))

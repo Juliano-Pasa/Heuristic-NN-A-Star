@@ -113,7 +113,7 @@ def draw_surface(file, projection, alt_diff):
     # ALTURA DAS COORDENADAS <- MDE (COLORAÇÃO DO PNG DO FILE)
     z = img[:, :, :-1] * alt_diff
 
-    visited = open_csv('../DADOS_RESULTADOS/opened.csv')
+    visited = open_csv('../DADOS_RESULTADOS/opened2.csv')
     viewshed = mpimg.imread(projection)
 
     # ------------------------ PLOT SUPERFICIE --------------------------- #
@@ -141,7 +141,7 @@ def draw_surface(file, projection, alt_diff):
 
 
     # ----------------------------------------- OBSERVADOR(ES) ---------------------------------------------------- #
-    viewpoints = [(115, 126)]
+    '''viewpoints = [(115, 126)]
     # viewpoints = []
     i = 0
     for vp_y, vp_x in viewpoints:
@@ -149,13 +149,13 @@ def draw_surface(file, projection, alt_diff):
         mk = '$' + str(i) + '$'
         mk = '$O$'
         ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker='o', color='w', zorder=4.55, s=250)
-        ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker=mk, color='r', zorder=4.6, s=150)
+        ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker=mk, color='r', zorder=4.6, s=150)'''
 
     # ----------------------------------------------------------------------------------------------------------- #
 
     # ---------------------------------------- CAMINHO ---------------------------------------------------------- #
     # marca as coordenadas percorridas
-    path = open_csv('../DADOS_RESULTADOS/visited.csv')
+    path = open_csv('../DADOS_RESULTADOS/visited2.csv')
     # path = []
     # Pontos do caminho
     for i, cell in enumerate(path):
@@ -165,8 +165,12 @@ def draw_surface(file, projection, alt_diff):
         elif i == len(path) -1:
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='o', c='w', zorder=4.5, s=200)
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='$S$', color='b', zorder=4.55, s=100)
+            continue
         else:
             ax.scatter(cell[0], cell[1], z[cell[0], cell[1], 0], marker='o', c='c', zorder=4.49, s=10)
+        x1,y1 = path[i]
+        x2,y2 = path[i+1]
+        plt.plot([x1,x2],[y1,y2],'b')
     # ----------------------------------------------------------------------------------------------------------- #
 
     #ax.view_init(90, 180)
@@ -176,6 +180,7 @@ def draw_surface(file, projection, alt_diff):
     # ax.set_yticks([])
     # ax.set_zticks([])
     plt.axis('off')
+        
     ax.grid(False)
     fig.subplots_adjust(top=1, bottom=0, right=1, left=0,
                         hspace=0, wspace=0)
