@@ -25,6 +25,8 @@ from   tensorflow.keras.layers       import Dense, Dropout, Input
 from   tensorflow.keras.models       import load_model, Sequential
 from   tensorflow.keras.optimizers   import Adam
 
+ANGULO_MAX =30
+
 
 def r2_distance(x1, x2, y1, y2):
     return np.sqrt(((x1 - x2) ** 2) + ((y1 - y2) ** 2))
@@ -376,129 +378,8 @@ def heuristica_padrao(start,goal):
 
     return r2_distance(x1,x2,y1,y2)
 
-def line_of_sight(c_parent,c_child,grid):
-    x1, y1 = c_parent.get_coordinates()
-    x2, y2 = c_child.get_coordinates()
 
-    dy=y1 - y2
-    dx=x1 - x2
-    sy = 1
-    sx = 1
-    if dy < 0:
-        dy = -dy
-        sy=-1
-    if dx < 0:
-        dx = -dx
-        sx = -1
 
-        #define o erro do teste de colisao quanto maior o erro para um lado a linha vai pender para aquele lado
-    error_x = 2*dx
-    error_y = 2*dy
-
-    if  error_x>error_y:
-        r = (error_y-error_x)/2
-        x = x2
-        y = y2
-        e = 0
-        while x is not x1:
-            if e > r:
-                x = x + sx
-                e = e-error_y
-            elif e < r:
-                y = y + sy
-                e = e + error_x
-            else:
-                x = x + sx
-                y = y + sy
-                e = e + sx - sy
-            #if para verificar se esta bloqueado
-    else:
-        r = (error_y-error_x)/2
-        x = x2
-        y = y2
-        e = 0
-        while y is not y1:
-            if e > r:
-                y = y + sy
-                e = e-error_x
-            elif e < r:
-                x = x + sx
-                e = e + error_y
-            else:
-                x = x + sx
-                y = y + sy
-                e = e + sy - sx
-            #if para verificar se esta bloqueado
-    return True
-
-def line_of_sightNonUniform(c_parent,c_child,grid):
-    
-    x1, y1 = c_parent.get_coordinates()
-    x2, y2 = c_child.get_coordinates()
-
-    dy=y1 - y2
-    dx=x1 - x2
-    sy = 1
-    sx = 1
-    if dy < 0:
-        dy = -dy
-        sy=-1
-    if dx < 0:
-        dx = -dx
-        sx = -1
-
-        #define o erro do teste de colisao quanto maior o erro para um lado a linha vai pender para aquele lado
-    error_x = 2*dx
-    error_y = 2*dy
-
-    cost = 0.0
-
-    if  error_x>error_y:
-        r = (error_y-error_x)/2
-        x = x2
-        y = y2
-        e = 0
-
-        cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
-
-        while x is not x1:
-            if e > r:
-                x = x + sx
-                e = e-error_y
-            elif e < r:
-                y = y + sy
-                e = e + error_x
-            else:
-                x = x + sx
-                y = y + sy
-                e = e + sx - sy
-            #if para verificar se esta bloqueado
-            
-            cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
-        cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
-    else:
-        r = (error_y-error_x)/2
-        x = x2
-        y = y2
-        e = 0
-
-        cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
-
-        while y is not y1:
-            if e > r:
-                y = y + sy
-                e = e-error_x
-            elif e < r:
-                x = x + sx
-                e = e + error_y
-            else:
-                x = x + sx
-                y = y + sy
-                e = e + sy - sx
-            #if para verificar se esta bloqueado
-            cost = cost + (grid.get_vertex_by_coords(x,y).get_elevation()/2)
-        cost = cost-(grid.get_vertex_by_coords(x,y).get_elevation()/2)
-    return (True,cost)
 
 def calcula_angulo(vert,vert1):
     if vert is None or vert1 is None:
@@ -541,7 +422,7 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
-    anguloMAX=0
+    
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
@@ -566,15 +447,15 @@ def line_of_sight1(s,s1,g):#original
             
             idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
-                if calcula_angulo(vert_src,vert_tgt)>anguloMAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     #print("ENTREI AQUI")
                     return False
                 y0 = y0 + sy
                 f = f - dx
 
-            if f!=0 and calcula_angulo(vert_src, vert_tgt)>anguloMAX:
+            if f!=0 and calcula_angulo(vert_src, vert_tgt)>ANGULO_MAX:
                 return False
-            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>anguloMAX:
+            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>ANGULO_MAX:
                 return False
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
@@ -592,17 +473,17 @@ def line_of_sight1(s,s1,g):#original
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
-                if calcula_angulo(vert_src,vert_tgt)>anguloMAX:
+                if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
                     return False
                 
                 x0 = x0 + sx
                 f = f - dy
 
-            if f != 0 and calcula_angulo(vert_src,vert_tgt)>anguloMAX:
+            if f != 0 and calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
                 return False
             
             
-            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>anguloMAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>anguloMAX:
+            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>ANGULO_MAX:
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
                 return False
@@ -615,12 +496,6 @@ def line_of_sight1(s,s1,g):#original
             #cost = cost + (g.get_vertex(get_id_by_coords(x_i_vertex,y_j_vertex)).get_elevation()/2)
     return True, cost
 
-def CalculateCost(child,current,grid):
-    if line_of_sight(current.get_previous(), child, grid):
-        parent = current.get_previous()
-    else:
-        parent = current
-    return (parent.get_elevation() + heuristica_padrao(parent,child), parent)
 
 def CalculateCostNonUniform(child,current,grid):
     g2=math.inf
@@ -649,7 +524,7 @@ def CalculateCostNonUniform(child,current,grid):
 
 
 # A* adaptado com fator de segurança no cálculo do custo
-def safe_astar(g, start, goal, v_weight, heuristic):
+def theta(g, start, goal, v_weight, heuristic):
     opened = []
     expanded = []
 
@@ -836,42 +711,57 @@ def astar(g, start, goal, v_weight, heuristic):
         current = uv[0]
         del opened[save]
         expanded.append(current)
+        count_open+=1
 
         if current == goal:
             distance = current.get_distance()
             path = []
             path.append(goal.get_coordinates())
-            count_visited=0
+            count_visited=1
             print("salvando o path\n")
             while current.get_id() != start.get_id():
                 path.append(current.get_coordinates())
                 current = current.get_previous()
+                count_visited=+1
             path.append(current.get_coordinates())
             closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
-            return current.get_distance(), visibility_weight * current.get_risk(), count_visited, count_open, closed_nodes, path, distance
+            return current.get_distance(), len(path), count_open, closed_nodes, path, distance
 
-        #current.set_visited(True)
+        current.set_visited(True)
         #visited.append(current.get_previous().get_coordinates())
 
         for next_id in current.get_neighbors():
             next = g.get_vertex(next_id)
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
-            new_dist = current.get_distance() + heuristic(current, next) 
-
             #new_risk = current.get_risk() + next.get_local_risk()
+            if next not in expanded:
+                ind = 0
+                newborn = True
+                for ind in range(len(opened)):
+                    c, hs = opened[ind]
+                    if(c == next): 
+                        newborn = False
 
-            if new_dist < next.get_distance():
-                next.set_previous(current)
-                next.set_distance(new_dist)
+                if newborn:
+                    next.set_distance(math.inf)
+                    next.set_previous(None)
+                new_dist = current.get_distance() + heuristic(current,next)
+
+                if new_dist < next.get_distance():
+                    next.set_previous(current)
+                    next.set_distance(new_dist)
                 #next.set_risk(new_risk)
-
+                    for ind in range(len(opened)):
+                            c, hs = opened[ind]
+                            if next == c:                            
+                                del opened[ind]
+                                break
                 
 
-                hscore = new_dist + heuristic(next, goal)
+                    hscore = new_dist + heuristic(next, goal)
 
-                if next not in expanded:
                     opened.append((next, hscore))
-                    count_open = count_open + 1
+                    #count_open = count_open + 1
                     #opened.append(next.get_coordinates())
 
 def astarmod(g, start, goal, v_weight, heuristic):
@@ -922,18 +812,27 @@ def astarmod(g, start, goal, v_weight, heuristic):
                 count_visited=+1
             path.append(current.get_coordinates())
             closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
-            return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
+            return current.get_distance(), len(path), count_open, closed_nodes, path, distance
 
-        #current.set_visited(True)
+        current.set_visited(True)
         #visited.append(current.get_previous().get_coordinates())
-
+        
         for next_id in current.get_neighbors():
             next = g.get_vertex(next_id)
             #mudar de edge weight para a distancia entre o nodo atual e o proximo na 2 parte da soma c
-
             #new_risk = current.get_risk() + next.get_local_risk()
-            if next not in expanded:
-                new_dist = current.get_distance() + current.get_edge_weight(next_id)
+            if next not in expanded and calcula_angulo(current,next)<ANGULO_MAX:
+                ind = 0
+                newborn = True
+                for ind in range(len(opened)):
+                    c, hs = opened[ind]
+                    if(c == next): 
+                        newborn = False
+
+                if newborn:
+                    next.set_distance(math.inf)
+                    next.set_previous(None)
+                new_dist = current.get_distance() + heuristic(current,next)
 
                 if new_dist < next.get_distance():
                     next.set_previous(current)
@@ -1089,7 +988,6 @@ def heuristic_dict2(g, model, observer, goal):
 
     return dict_heuristica, t1_stop - t1_start
 
-
 def dict_dnn_heuristic1(start, goal):
     predicao = dnn_heuristic_dict1[start.get_id()][0]
     return predicao
@@ -1146,7 +1044,7 @@ def count_visible_nodes(v, path, count_visible):
 def main():
     args = sys.argv
     filename = args[1] # recorte .tif do terreno
-    #model_name1 = args[2] # modelo 1 de DNN treinada (só para características topográficas)
+    model_name1 = 'model_1_10.hdf5' # modelo 1 de DNN treinada (só para características topográficas)
     #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
@@ -1164,7 +1062,7 @@ def main():
     viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
 
     # Carrega os modelos das redes neurais treinadas
-    #model1 = load_model(model_name1)
+    model1 = load_model(model_name1)
     #model2 = load_model(model_name2)
 
     print('Iniciando')
@@ -1181,6 +1079,10 @@ def main():
     data_io_opened = io.StringIO()
     data_io_visited2 = io.StringIO()
     data_io_opened2 = io.StringIO()
+    data_io_visited3 = io.StringIO()
+    data_io_opened3 = io.StringIO()
+    data_io_visited4 = io.StringIO()
+    data_io_opened4 = io.StringIO()
 
     data_io_time_cost_dnn1 = io.StringIO()
     data_io_visited_cost_dnn1 = io.StringIO()
@@ -1188,6 +1090,7 @@ def main():
     data_io_visited_cost_dnn2 = io.StringIO()
     data_io_comp = io.StringIO()
     data_io_comp2 = io.StringIO()
+    data_io_comp3 = io.StringIO()
     data_io_all = io.StringIO()
 
     # cabecalho dos arquivos csv, separador utilizado é o ';'
@@ -1231,6 +1134,8 @@ def main():
         data_io_visited_cost_dnn2 = io.StringIO()
         data_io_comp = io.StringIO()
         data_io_comp2 = io.StringIO()
+        data_io_comp3 = io.StringIO()
+        data_io_comp4 = io.StringIO()
         data_io_all = io.StringIO()
 
         b = 0.5  # Fator de importância da segurança no cálculo do custo
@@ -1268,14 +1173,17 @@ def main():
             dest = g.get_vertex(dest_id)
             global dnn_heuristic_dict1
             global dnn_heuristic_dict2
-            #dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
+            
+            #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
+            
+            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
             #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model2, observer, dest)
 
             #4 casos:
-            #1) A* simples, heurística padrao
+            #1) A* simples, heurística r3
             heuristic = r3_heuristic
             t1 = time()
-            distance1, count_visited1, count_open1, opened1, visited1, cost1 = astarmod(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            distance1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
             path1 = [dest.get_id()]
             print("custo do a*: ",cost1)
             print("nodos visitados: ",count_visited1)
@@ -1288,12 +1196,12 @@ def main():
 
             print("terminou A*")
 
-            #2)A* adaptado, heuristica r3
+            #2)A* adaptado, heuristica r3 e caculo de Angulos
             heuristic = heuristica_padrao
             t2 = time()
             
-            distance2, count_visited2, count_open2, opened2, visited2, cost2 = safe_astar(g, source, dest, b, heuristic)
-            print("custo do theta: ",cost2)
+            distance2, count_visited2, count_open2, opened2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
+            print("custo do A* topografico: ",cost2)
             print("nodos visitados: ",count_visited2)
             print("nodos abertos: ",count_open2)
             
@@ -1304,22 +1212,44 @@ def main():
             print("tempo de duração: ", t2)
             g.reset()
 
-            data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
-            data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
-            '''    
-            #3) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
-            heuristic = dict_dnn_heuristic1
+            #3)Theta* adaptado, heuristica r3 e calculo de angulo
+            heuristic = heuristica_padrao
             t3 = time()
-            distance3, safety3, count_visited3, count_open3, opened3, visited3, cost3 = safe_astar(g, source, dest, b, heuristic)
+            
+            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta(g, source, dest, b, heuristic)
+            print("custo do theta: ",cost3)
+            print("nodos visitados: ",count_visited3)
+            print("nodos abertos: ",count_open3)
+            
             path3 = [dest.get_id()]
             count_visible3 = count_visible_nodes(dest, path3, 0)
             path_len3 = len(path3)
-            t3 = time() - t3 + h_map_time1
+            t3 = time() - t3
+            print("tempo de duração: ", t3)
+            g.reset()
+            
+            
+            data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
+            data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
+            
+            #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
+            heuristic = dict_dnn_heuristic1
+            t4 = time()
+            distance4, count_visited4, count_open4, opened4, visited4, cost4 = astar(g, source, dest, b, heuristic)
+            path4 = [dest.get_id()]
+            count_visible4 = count_visible_nodes(dest, path4, 0)
+            path_len4 = len(path4)
+            t4 = time() - t4 + h_map_time1
+            
+            print("custo do theta: ",cost4)
+            print("nodos visitados: ",count_visited4)
+            print("nodos abertos: ",count_open4)
+            print("tempo de duração: ", t4)
             g.reset()
 
-            data_io_time_cost_dnn1.write("""%s;%s\n""" % (t3, cost3))
-            data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited3, cost3))
-
+            data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
+            data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
+            '''
             #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
             heuristic = dict_dnn_heuristic2
             t4 = time()
@@ -1336,6 +1266,9 @@ def main():
 
             data_io_comp.write("""%s;%s;%s;%s;%s;%s\n""" %(distance1,cost1,t1,count_visited1,path_len1,count_visible1))
             data_io_comp2.write("""%s;%s;%s;%s;%s;%s\n""" %(distance2,cost2,t2,count_visited2,path_len2,count_visible2))
+            data_io_comp3.write("""%s;%s;%s;%s;%s;%s\n""" %(distance3,cost3,t3,count_visited3,path_len3,count_visible3))
+            data_io_comp4.write("""%s;%s;%s;%s;%s;%s\n""" %(distance4,cost4,t4,count_visited4,path_len4,count_visible4))
+            
 
             if teste:
                 teste=False
@@ -1354,6 +1287,22 @@ def main():
 
                 write_dataset_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
                 write_dataset_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
+                
+                for i in range(len(opened3)):
+                    data_io_opened3.write("""%s\n"""%str((opened3[i])))
+                for i in range(len(visited3)):
+                    data_io_visited3.write("""%s\n"""%str((visited3[i])))
+
+                write_dataset_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
+                write_dataset_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)
+                
+                for i in range(len(opened4)):
+                    data_io_opened4.write("""%s\n"""%str((opened4[i])))
+                for i in range(len(visited4)):
+                    data_io_visited4.write("""%s\n"""%str((visited4[i])))
+
+                write_dataset_csv('./DADOS_RESULTADOS/visited4.csv',data_io_visited4)
+                write_dataset_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
                 break
 
 
