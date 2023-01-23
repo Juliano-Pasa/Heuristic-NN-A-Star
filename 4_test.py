@@ -745,7 +745,9 @@ def astar(g, start, goal, v_weight, heuristic):
                 if newborn:
                     next.set_distance(math.inf)
                     next.set_previous(None)
-                new_dist = current.get_distance() + heuristic(current,next)
+                new_dist = current.get_distance() + r3_heuristic(current,next)
+                #print("Eu nodo "+str(current.get_id())+"indo para o nodo "+str(next.get_id())+"custo r3"+str(r3_heuristic(current,next)))
+                #print("Eu nodo "+str(current.get_id())+"indo para o nodo "+str(next.get_id())+"custo dnn"+str(heuristic(current,next)))
 
                 if new_dist < next.get_distance():
                     next.set_previous(current)
@@ -1044,7 +1046,7 @@ def count_visible_nodes(v, path, count_visible):
 def main():
     args = sys.argv
     filename = args[1] # recorte .tif do terreno
-    model_name1 = 'model_1_10.hdf5' # modelo 1 de DNN treinada (só para características topográficas)
+    model_name1 = 'modelo_249_epocas.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
     #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
@@ -1059,11 +1061,11 @@ def main():
     print('Gerando os viewsheds')
     # Coordenadas de cada observador
     # Gera as mesma coordenadas utilizadas na criação do dataset de treinamento
-    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
+    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
 
     # Carrega os modelos das redes neurais treinadas
+    #model1 = load_model(model_name1)
     model1 = load_model(model_name1)
-    #model2 = load_model(model_name2)
 
     print('Iniciando')
 
@@ -1141,11 +1143,12 @@ def main():
         b = 0.5  # Fator de importância da segurança no cálculo do custo
         visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
 
-        viewshed = read_viewshed(visibility_map_file)
-        viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
+        #viewshed = read_viewshed(visibility_map_file)
+        #viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
 
         # Atribui a cada vértice o nível de visibilidade do viewshed
-        g.update_vertices_risk(viewshed)
+        
+        #g.update_vertices_risk(viewshed)
 
         # ------------------------------------------------------------ #
         # Cria as combinações de pares de origem-destino
@@ -1164,8 +1167,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = pair[0]
-            dest_coords = pair[1]
+            src_coords = (128,192)#pair[0]
+            dest_coords = (58,92)#pair[1]
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
 
@@ -1176,8 +1179,8 @@ def main():
             
             #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
             
-            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
-            #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model2, observer, dest)
+            #dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
+            dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model1, observer, dest)
 
             #4 casos:
             #1) A* simples, heurística r3
@@ -1197,7 +1200,7 @@ def main():
             print("terminou A*")
 
             #2)A* adaptado, heuristica r3 e caculo de Angulos
-            heuristic = heuristica_padrao
+            heuristic = r3_heuristic
             t2 = time()
             
             distance2, count_visited2, count_open2, opened2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
@@ -1233,18 +1236,19 @@ def main():
             data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
             
             #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
-            heuristic = dict_dnn_heuristic1
+            heuristic = dict_dnn_heuristic2
             t4 = time()
             distance4, count_visited4, count_open4, opened4, visited4, cost4 = astar(g, source, dest, b, heuristic)
             path4 = [dest.get_id()]
-            count_visible4 = count_visible_nodes(dest, path4, 0)
+            #count_visible4 = count_visible_nodes(dest, path4, 0)
             path_len4 = len(path4)
-            t4 = time() - t4 + h_map_time1
+            t4 = time() - t4
             
-            print("custo do theta: ",cost4)
+            print("custo do a* com dnn: ",cost4)
             print("nodos visitados: ",count_visited4)
             print("nodos abertos: ",count_open4)
             print("tempo de duração: ", t4)
+            print("tempo do mapeamente heurístico: ", h_map_time2)
             g.reset()
 
             data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
@@ -1267,7 +1271,7 @@ def main():
             data_io_comp.write("""%s;%s;%s;%s;%s;%s\n""" %(distance1,cost1,t1,count_visited1,path_len1,count_visible1))
             data_io_comp2.write("""%s;%s;%s;%s;%s;%s\n""" %(distance2,cost2,t2,count_visited2,path_len2,count_visible2))
             data_io_comp3.write("""%s;%s;%s;%s;%s;%s\n""" %(distance3,cost3,t3,count_visited3,path_len3,count_visible3))
-            data_io_comp4.write("""%s;%s;%s;%s;%s;%s\n""" %(distance4,cost4,t4,count_visited4,path_len4,count_visible4))
+            #data_io_comp4.write("""%s;%s;%s;%s;%s;%s\n""" %(distance4,cost4,t4,count_visited4,path_len4,count_visible4))
             
 
             if teste:
