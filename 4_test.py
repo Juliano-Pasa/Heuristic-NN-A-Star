@@ -658,7 +658,7 @@ def theta(g, start, goal, v_weight, heuristic):
                 
 
 
-def update_vertex(parent, child):
+'''def update_vertex(parent, child):
     grand_father = parent.get_previous()
     if line_of_sight1(grand_father, child):
         if grand_father.get_distance() + r3_distance(grand_father, child) < child.get_distance():
@@ -673,7 +673,7 @@ def update_vertex(parent, child):
             child.set_previous(parent)
             if (child, _) in opened:
                 opened.remove((child, _)) # verificar
-            opened.append(child, child.get_distance() + heuristic(child, goal)) # verificar
+            opened.append(child, child.get_distance() + heuristic(child, goal)) # verificar'''
 
 
 # A*
@@ -1046,10 +1046,10 @@ def count_visible_nodes(v, path, count_visible):
 def main():
     args = sys.argv
     filename = args[1] # recorte .tif do terreno
-    model_name1 = 'modelo_249_epocas.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+    model_name1 = 'model_1_10.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
     #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
-    reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
+    reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
     # Lê o arquivo do MDE e cria o grid do mapa
     mde = Mde(filename, reduction_factor)
@@ -1171,7 +1171,7 @@ def main():
             dest_coords = (58,92)#pair[1]
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
-
+            #print("aaaa",source)
             dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
             dest = g.get_vertex(dest_id)
             global dnn_heuristic_dict1
@@ -1179,8 +1179,8 @@ def main():
             
             #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
             
-            #dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
-            dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model1, observer, dest)
+            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
+            #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model1,observer, dest)
 
             #4 casos:
             #1) A* simples, heurística r3
@@ -1236,7 +1236,7 @@ def main():
             data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
             
             #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
-            heuristic = dict_dnn_heuristic2
+            heuristic = dict_dnn_heuristic1
             t4 = time()
             distance4, count_visited4, count_open4, opened4, visited4, cost4 = astar(g, source, dest, b, heuristic)
             path4 = [dest.get_id()]
@@ -1248,7 +1248,7 @@ def main():
             print("nodos visitados: ",count_visited4)
             print("nodos abertos: ",count_open4)
             print("tempo de duração: ", t4)
-            print("tempo do mapeamente heurístico: ", h_map_time2)
+            print("tempo do mapeamente heurístico: ", h_map_time1)
             g.reset()
 
             data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
