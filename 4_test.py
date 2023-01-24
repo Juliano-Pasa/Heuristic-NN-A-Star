@@ -47,6 +47,8 @@ class Mde:
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
         self.pixel_resolution = self.dataset.transform[0]
+
+        print("\n\n\n\n\nmetadados:",self.dataset.height)
         self.h_limit = self.dataset.height
         self.w_limit = self.dataset.width
 
@@ -422,7 +424,28 @@ def line_of_sight1(s,s1,g):#original
     f=0
     w=0
     
+    #calcula o angulo aqui 
+    x_s,y_s = s.get_r2_coordinates()
+    x_s1,y_s1 = s1.get_r2_coordinates()
+
+
+
+    # 
+    # equação da reta   y = m*x+n
+    #  
+
+    # m = tangente do angulo alfa
+    m = math.atan2(y_s1-y_s , x_s1-x_s)
+
+    #substituimos um dos pontos na equação da reta para obter o N
+    n = m*x_s - y_s
+
+    #agora que temos o n podemos calcular a reta em qualquer ponto dando o x e y como input
+
+    # y = m*x+n
     
+
+
     
     #definir uma variavel que vai definir se o desnivel é muito grande ou nao
     
@@ -1167,8 +1190,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = (128,192)#pair[0]
-            dest_coords = (58,92)#pair[1]
+            src_coords = pair[0]#pair[0](128,192)
+            dest_coords = pair[1]#pair[1](58,92)
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
             #print("aaaa",source)
