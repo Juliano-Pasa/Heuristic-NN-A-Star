@@ -48,7 +48,7 @@ class GenerateVars:
 
     #Configurações gerais 
     use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
-    sampling_rate = 10      # % da Amostragem
+    sampling_rate = 100      # % da Amostragem
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"
@@ -57,12 +57,12 @@ class GenerateVars:
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"
     maps = [
-        MapCase(1, "\\recorte400x400.tif"),
-        MapCase(2, "\\"),
+        MapCase(1, "\\recorte400x400.tif")
+    ]
+'''MapCase(2, "\\"),
         MapCase(3, "\\"),
         MapCase(4, "\\"),
         MapCase(5, "\\"),
         MapCase(6, "\\"),
         MapCase(7, "\\"),
-        MapCase(8, "\\")
-    ]
+        MapCase(8, "\\")'''

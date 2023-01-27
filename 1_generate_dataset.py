@@ -411,6 +411,20 @@ def kernel1(V, E, W, S, M, C, U, n, b):
             for nid, w in zip(E[start:end], W[start:end]):
                 cuda.atomic.min(U, nid, C[tid] + w + b * S[nid])
 
+@cuda.jit
+def kernel1_without_S(V, E, W, M, C, U, n, b):
+    tid = cuda.grid(1)
+    if tid < n:
+        if M[tid] == 1:
+            M[tid] = 0
+            start = V[tid]
+            if tid == n-1:
+                end = len(E)
+            else:
+                end = V[tid+1]
+            for nid, w in zip(E[start:end], W[start:end]):
+                cuda.atomic.min(U, nid, C[tid] + w)
+
 
 @cuda.jit
 def initialize_arrays(source, n, INF, M, C, U, S, b):
@@ -422,6 +436,17 @@ def initialize_arrays(source, n, INF, M, C, U, S, b):
             M[tid] = 1
             C[tid] = S[tid] * b
             U[tid] = S[tid] * b
+
+
+@cuda.jit
+def initialize_arrays_without_S(source, n, INF, M, C, U, b):
+    tid = cuda.grid(1)
+    if tid < n:
+        C[tid] = INF
+        U[tid] = INF
+        if tid == source:
+            M[tid] = 1
+
 
 
 @cuda.reduce
@@ -471,10 +496,10 @@ def cuda_safe_sssp_without_S(V, E, W, source, b):
     d_E = cuda.to_device(E)
     d_W = cuda.to_device(W)   
 
-    initialize_arrays[blockspergrid, threadsperblock](source, n, INF, d_M, d_C, d_U, b)
+    initialize_arrays_without_S[blockspergrid, threadsperblock](source, n, INF, d_M, d_C, d_U, b)
     mask = sum_reduce(d_M)
     while mask > 0:
-        kernel1[blockspergrid, threadsperblock](d_V, d_E, d_W, d_M, d_C, d_U, n, b)
+        kernel1_without_S[blockspergrid, threadsperblock](d_V, d_E, d_W, d_M, d_C, d_U, n, b)
         kernel2[blockspergrid, threadsperblock](d_M, d_C, d_U, n)
         mask = sum_reduce(d_M)
     C = d_C.copy_to_host()
@@ -511,15 +536,17 @@ import AUXILIARES.generate_viewshed as vs
 
 
 # Gera uma lista de tuplas de pontos de amostras para geração do dataset
-def generate_sample_points(sampling_percentage):
+def generate_sample_points(sampling_percentage,rows,collumns):
 
     # Divide o mapa em 4x4 clusters
     sections_n = 4
     sections_m = 4
 
     # Tamanho das divisões do mapa
-    SECTION_ROWS = round(GRID_ROWS/sections_n)
-    SECTION_COLS = round(GRID_COLS/sections_m)
+
+
+    SECTION_ROWS = round(rows/sections_n)
+    SECTION_COLS = round(collumns/sections_m)
 
     # Conjunto de pontos amostrados, ordenados da esquerda pra direta, de cima pra baixo
     P = []
@@ -563,9 +590,10 @@ def observer_points(grid, n, m, r=10, spacing=4):  #divide o grid(n x m) em r x 
 
 def generate_dataset():
     print('Gerando os pontos de amostra')    
-    sample_coords = generate_sample_points(GenerateVars.sampling_rate/100) # Gera os pontos de amostra
+    sample_coords = generate_sample_points(GenerateVars.sampling_rate/100,rows=400,collumns=400) # Gera os pontos de amostra
 
     # Lê o grid do MDE do terreno
+    count=0
     for mp in GenerateVars.maps:
         map_path = GenerateVars.maps_dir + mp.filename
         mde = Mde(map_path, mp.reduction_factor)
@@ -577,42 +605,44 @@ def generate_dataset():
         g = Graph(mde)
 
 
-    # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
-    V, E, W = generate_sssp_arrays(g)
+        # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
+        V, E, W = generate_sssp_arrays(g)
 
-    print('Gerando o dataset')
-    # Realiza o mesmo processo para cada observador
-    
-    for map_case in GenerateVars.maps:            
-        start_time = process_time()
-        #Não adaptado para suportar múltiplos mapas.
+        print('Gerando o dataset: ',count)
+        count=+1
+        # Realiza o mesmo processo para cada observador
+        
+        for map_case in GenerateVars.maps:            
+            start_time = process_time()
+            #Não adaptado para suportar múltiplos mapas.
 
-        start_time = process_time()
-    
-        aux = 0
-        for src_coords in sample_coords:
-            data_io = io.StringIO()
-            source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-            b = 0 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-            C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
+            start_time = process_time()
+        
+            aux = 0
+            #print("aaaaaaaaaaaaaaaaaaaaaaaaaa")
+            for src_coords in sample_coords:
+                data_io = io.StringIO()
+                source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+                b = 0 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
+                C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
 
-            # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-            for dest_coords in sample_coords[aux+1:]:
-                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write(map_case.id_map, 
-                str(int(src_coords[1] * CELL_WIDTH)), 
-                str(int(src_coords[0] * CELL_HEIGHT)),
-                str(mde.grid[src_coords[0], src_coords[1]]), 
-                str(int(dest_coords[1] * CELL_WIDTH)),
-                str(int(dest_coords[0] * CELL_HEIGHT)), 
-                mde.grid[dest_coords[0], dest_coords[1]], 
-                C[dest])
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-            aux = aux +1
+                # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (map_case.id_map, 
+                    str(int(src_coords[1] * CELL_WIDTH)), 
+                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(mde.grid[src_coords[0], src_coords[1]]), 
+                    str(int(dest_coords[1] * CELL_WIDTH)),
+                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    mde.grid[dest_coords[0], dest_coords[1]], 
+                    C[dest]))
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                aux = aux +1
 
-            write_dataset_csv('dataset_'+'sem_observador'+'.csv', data_io)
-        print('Tempo: ' + str(process_time() - start_time) + ' segundos')
-        break
+                write_dataset_csv('dataset_'+'sem_observador'+'.csv', data_io)
+            print('Tempo: ' + str(process_time() - start_time) + ' segundos')
+            break
         
 
     print('Dataset gerado com sucesso!')
