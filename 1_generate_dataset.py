@@ -561,14 +561,7 @@ def observer_points(grid, n, m, r=10, spacing=4):  #divide o grid(n x m) em r x 
     return pontos
 
 
-
-def main():
-    print("Casoco")
-    print(GenerateVars.maps_dir)
-    #args = sys.argv
-    #filename = args[1] # Recorte do terreno
-
-
+def generate_dataset():
     print('Gerando os pontos de amostra')    
     sample_coords = generate_sample_points(GenerateVars.sampling_rate/100) # Gera os pontos de amostra
 
@@ -584,13 +577,68 @@ def main():
         g = Graph(mde)
 
 
-        #print('Gerando os viewsheds')
-        # Coordenadas de cada observador
-        #viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
-        # Raio de visão dos observadores
-        #view_radius = 40
-        # Altura do observador (metros) em relação ao chão
-        #viewpoint_height = 5
+    # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
+    V, E, W = generate_sssp_arrays(g)
+
+    print('Gerando o dataset')
+    # Realiza o mesmo processo para cada observador
+    
+    for map_case in GenerateVars.maps:            
+        start_time = process_time()
+        #Não adaptado para suportar múltiplos mapas.
+
+        start_time = process_time()
+    
+        aux = 0
+        for src_coords in sample_coords:
+            data_io = io.StringIO()
+            source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+            b = 0 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
+            C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
+
+            # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
+            for dest_coords in sample_coords[aux+1:]:
+                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                data_io.write(map_case.id_map, 
+                str(int(src_coords[1] * CELL_WIDTH)), 
+                str(int(src_coords[0] * CELL_HEIGHT)),
+                str(mde.grid[src_coords[0], src_coords[1]]), 
+                str(int(dest_coords[1] * CELL_WIDTH)),
+                str(int(dest_coords[0] * CELL_HEIGHT)), 
+                mde.grid[dest_coords[0], dest_coords[1]], 
+                C[dest])
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+            aux = aux +1
+
+            write_dataset_csv('dataset_'+'sem_observador'+'.csv', data_io)
+        print('Tempo: ' + str(process_time() - start_time) + ' segundos')
+        break
+        
+
+    print('Dataset gerado com sucesso!')
+    
+def generate_dataset_with_viewpoints():    
+    filename = GenerateVars.vps_map_dir + GenerateVars.vps_map.filename
+    reduction_factor = GenerateVars.vps_map.reduction_factor
+
+    # Lê o grid do MDE do terreno
+    mde = Mde(filename, reduction_factor)
+
+    print('Criando o grafo')
+    # Cria o grafo a partir do MDE
+    g = Graph(mde)
+
+    print('Gerando os pontos de amostra')
+    sampling_rate = GenerateVars.sampling_rate
+    sample_coords = generate_sample_points(sampling_rate/100) # Gera os pontos de amostra
+
+    print('Gerando os viewsheds')
+    # Coordenadas de cada observador
+    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
+    # Raio de visão dos observadores
+    view_radius = 40
+    # Altura do observador (metros) em relação ao chão
+    viewpoint_height = 5
 
     print('Salvando os viewsheds')
     if not os.path.exists("./VIEWSHEDS/"):
@@ -605,63 +653,42 @@ def main():
 
     print('Gerando o dataset')
     # Realiza o mesmo processo para cada observador
-    if(GenerateVars.use_viewpoints):
-        
-        #Não adaptado para suportar múltiplos mapas.
-        for vp in viewpoints:
-            start_time = process_time()
-            visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
+    for vp in viewpoints:
+        start_time = process_time()
+        visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
 
-            viewshed = read_viewshed(visibility_map_file)
-            viewshed = g.normalize_visibility(viewshed)
-            S = serialize_viewshed(viewshed)
+        viewshed = read_viewshed(visibility_map_file)
+        viewshed = g.normalize_visibility(viewshed)
+        S = serialize_viewshed(viewshed)
 
-            aux = 0
-            for src_coords in sample_coords:
-                data_io = io.StringIO()
-                source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-                b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-                C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
+        aux = 0
+        for src_coords in sample_coords:
+            data_io = io.StringIO()
+            source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+            b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
+            C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
 
-                # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-                for dest_coords in sample_coords[aux+1:]:
-                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                    data_io.write(str(int(src_coords[1] * CELL_WIDTH)), str(int(src_coords[0] * CELL_HEIGHT)),str(mde.grid[src_coords[0], src_coords[1]]), str(int(dest_coords[1] * CELL_WIDTH)),str(int(dest_coords[0] * CELL_HEIGHT)), mde.grid[dest_coords[0], dest_coords[1]], C[dest])
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                aux = aux +1
+            # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
+            for dest_coords in sample_coords[aux+1:]:
+                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+            aux = aux +1
 
-                write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
-            print('Tempo: ' + str(process_time() - start_time) + ' segundos')
-            break
-    else:
-        for map_instance in GenerateVars.maps:            
-            start_time = process_time()
-            map_instance
-            #Não adaptado para suportar múltiplos mapas.
-
-            for vp in viewpoints:
-                start_time = process_time()
-
-                aux = 0
-                for src_coords in sample_coords:
-                    data_io = io.StringIO()
-                    source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-                    b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-                    C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
-
-                    # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-                    for dest_coords in sample_coords[aux+1:]:
-                        dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                        data_io.write(str(int(src_coords[1] * CELL_WIDTH)), str(int(src_coords[0] * CELL_HEIGHT)),str(mde.grid[src_coords[0], src_coords[1]]), str(int(dest_coords[1] * CELL_WIDTH)),str(int(dest_coords[0] * CELL_HEIGHT)), mde.grid[dest_coords[0], dest_coords[1]], C[dest])
-                        #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                    aux = aux +1
-
-                    write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
-                print('Tempo: ' + str(process_time() - start_time) + ' segundos')
-                break
-            
+            write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
+        print('Tempo: ' + str(process_time() - start_time) + ' segundos')
 
     print('Dataset gerado com sucesso!')
+    
+def main():
+    print("Casoco")
+    print(GenerateVars.maps_dir)
+    #args = sys.argv
+    #filename = args[1] # Recorte do terreno
+    if(GenerateVars.use_viewpoints):
+        generate_dataset_with_viewpoints()
+    else:
+        generate_dataset()    
 
 if __name__ == '__main__':
     main()

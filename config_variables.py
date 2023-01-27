@@ -40,14 +40,22 @@ class TestVars:
 
 class MapCase:
     def __init__(self, id_map, filename, reduction_factor = 1):
-        self.id = id_map
+        self.id_map = id_map
         self.filename = filename
         self.reduction_factor = reduction_factor
 
-class GenerateVars:
+class GenerateVars:   
+
+    #Configurações gerais 
     use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
     sampling_rate = 10      # % da Amostragem
-    maps_dir = ".\\maps"
+
+    #Configuração para geração com viewpoints 
+    vps_map_dir = ".\\maps\\vps\\"
+    vps_map = MapCase(1, "\\recorte400x400.tif")
+
+    #Configuração para geração com múltiplos mapas (sem viewpoints) 
+    maps_dir = ".\\maps\\novps\\"
     maps = [
         MapCase(1, "\\recorte400x400.tif"),
         MapCase(2, "\\"),
