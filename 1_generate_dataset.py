@@ -455,6 +455,30 @@ def cuda_safe_sssp(V, E, W, S, source, b):
     C = d_C.copy_to_host()
     return C
 
+def cuda_safe_sssp_without_S(V, E, W, source, b):
+    n = V.shape[0]
+    INF = 999999
+    threadsperblock = 128
+    blockspergrid = (n + (threadsperblock - 1)) // threadsperblock
+
+    M = np.zeros(n, dtype=np.int32)
+    C = np.arange(n, dtype=np.float64)
+    U = np.arange(n, dtype=np.float64)
+    d_M = cuda.to_device(M)
+    d_C = cuda.to_device(C)
+    d_U = cuda.to_device(U)
+    d_V = cuda.to_device(V)
+    d_E = cuda.to_device(E)
+    d_W = cuda.to_device(W)   
+
+    initialize_arrays[blockspergrid, threadsperblock](source, n, INF, d_M, d_C, d_U, b)
+    mask = sum_reduce(d_M)
+    while mask > 0:
+        kernel1[blockspergrid, threadsperblock](d_V, d_E, d_W, d_M, d_C, d_U, n, b)
+        kernel2[blockspergrid, threadsperblock](d_M, d_C, d_U, n)
+        mask = sum_reduce(d_M)
+    C = d_C.copy_to_host()
+    return C
 
 # Cria listas de adjacências das conexões do grafo
 def generate_sssp_arrays(g):
@@ -610,7 +634,32 @@ def main():
             print('Tempo: ' + str(process_time() - start_time) + ' segundos')
             break
     else:
-        for map in GenerateVars.maps
+        for map_instance in GenerateVars.maps:            
+            start_time = process_time()
+            map_instance
+            #Não adaptado para suportar múltiplos mapas.
+
+            for vp in viewpoints:
+                start_time = process_time()
+
+                aux = 0
+                for src_coords in sample_coords:
+                    data_io = io.StringIO()
+                    source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+                    b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
+                    C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
+
+                    # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
+                    for dest_coords in sample_coords[aux+1:]:
+                        dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                        data_io.write(str(int(src_coords[1] * CELL_WIDTH)), str(int(src_coords[0] * CELL_HEIGHT)),str(mde.grid[src_coords[0], src_coords[1]]), str(int(dest_coords[1] * CELL_WIDTH)),str(int(dest_coords[0] * CELL_HEIGHT)), mde.grid[dest_coords[0], dest_coords[1]], C[dest])
+                        #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                    aux = aux +1
+
+                    write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
+                print('Tempo: ' + str(process_time() - start_time) + ' segundos')
+                break
+            
 
     print('Dataset gerado com sucesso!')
 
