@@ -47,6 +47,7 @@ class Mde:
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
         self.pixel_resolution = self.dataset.transform[0]
+        print("\n\n\n\n\nmetadados:",self.dataset.transform[0])
 
         print("\n\n\n\n\nmetadados:",self.dataset.height)
         self.h_limit = self.dataset.height
@@ -1072,7 +1073,7 @@ def main():
     model_name1 = 'model_1_10.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
     #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
-    reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
+    reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
     # Lê o arquivo do MDE e cria o grid do mapa
     mde = Mde(filename, reduction_factor)
