@@ -1,5 +1,6 @@
 import io
 
+# ----- ----- Teste (Classe auxiliar)----- ----- #
 class TestCase:
     def __init__(self, name, file_suffix, algorithm, heuristic, create_heuristic_map = False):
         self.name = name
@@ -35,3 +36,25 @@ class TestVars:
         TestCase("Theta", "theta", "theta", "r3_heuristic"),
         TestCase("Astar (com DNN)", "astar_dnn", "astar", "dict_dnn_heuristic", create_heuristic_map=True)]
 
+# ----- ----- Generate dataset ----- ----- #
+
+class MapCase:
+    def __init__(self, id_map, filename, reduction_factor = 1):
+        self.id = id_map
+        self.filename = filename
+        self.reduction_factor = reduction_factor
+
+class GenerateVars:
+    use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
+    sampling_rate = 10      # % da Amostragem
+    maps_dir = ".\\maps"
+    maps = [
+        MapCase(1, "\\recorte400x400.tif"),
+        MapCase(2, "\\"),
+        MapCase(3, "\\"),
+        MapCase(4, "\\"),
+        MapCase(5, "\\"),
+        MapCase(6, "\\"),
+        MapCase(7, "\\"),
+        MapCase(8, "\\")
+    ]

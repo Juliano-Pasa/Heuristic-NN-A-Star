@@ -46,8 +46,8 @@ class Mde:
     def __init__(self, fp, reduction_factor):
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
-        self.pixel_resolution = self.dataset.transform[0]
-        print("\n\n\n\n\nmetadados:",self.dataset.transform[0])
+        self.pixel_resolution = round(self.dataset.transform[0] * 108000)
+        print("\n\n\n\n\nmetadados:", self.pixel_resolution)
 
         print("\n\n\n\n\nmetadados:",self.dataset.height)
         self.h_limit = self.dataset.height
