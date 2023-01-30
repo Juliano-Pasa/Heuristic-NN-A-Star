@@ -48,7 +48,7 @@ class GenerateVars:
 
     #Configurações gerais 
     use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
-    sampling_rate = 100      # % da Amostragem
+    sampling_rate = 10      # % da Amostragem
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"
