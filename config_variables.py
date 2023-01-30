@@ -57,12 +57,12 @@ class GenerateVars:
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"
     maps = [
-        MapCase(1, "\\recorte400x400.tif")
+        MapCase(1, "\\recorte300x300A.tif"),
+        MapCase(2, "\\recorte300x300B.tif"),
+        MapCase(3, "\\recorte300x300C.tif"),
+        MapCase(4, "\\recorte300x300D.tif"),
+        MapCase(5, "\\recorte300x300E.tif"),
+        MapCase(6, "\\recorte300x300F.tif"),
+        MapCase(7, "\\recorte300x300G.tif"),
+        MapCase(8, "\\recorte300x300H.tif")
     ]
-'''MapCase(2, "\\"),
-        MapCase(3, "\\"),
-        MapCase(4, "\\"),
-        MapCase(5, "\\"),
-        MapCase(6, "\\"),
-        MapCase(7, "\\"),
-        MapCase(8, "\\")'''
