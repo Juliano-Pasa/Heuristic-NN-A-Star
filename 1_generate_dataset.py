@@ -613,6 +613,22 @@ def generate_dataset():
         # Cria o grafo a partir do MDE
         g = Graph(mde)
         # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
+
+    # Coordenadas de cada observador
+        viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
+        # Raio de visão dos observadores
+        view_radius = 40
+        # Altura do observador (metros) em relação ao chão
+        viewpoint_height = 5
+
+        print('Salvando os viewsheds')
+        if not os.path.exists("./VIEWSHEDS/"):
+            os.makedirs("./VIEWSHEDS/")
+        files = glob.glob('./VIEWSHEDS/*')
+        for f in files:
+            os.remove(f)
+        save_viewsheds(mde.grid, viewpoints, view_radius, viewpoint_height)
+
         V, E, W = generate_sssp_arrays(g)
 
         print('Gerando o dataset: ',count)
@@ -620,14 +636,18 @@ def generate_dataset():
         # Realiza o mesmo processo para cada observador
 
         start_time = process_time()
-    
+        visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(viewpoints[0][0]) + '_' + str(viewpoints[0][1]) + '.png'
+
+        viewshed = read_viewshed(visibility_map_file)
+        viewshed = g.normalize_visibility(viewshed)
+        S = serialize_viewshed(viewshed)
         aux = 0
         #print("aaaaaaaaaaaaaaaaaaaaaaaaaa")
         for src_coords in sample_coords:
             data_io = io.StringIO()
             source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             b = 0 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-            C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
+            C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
             
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
             for dest_coords in sample_coords[aux+1:]:
@@ -644,7 +664,7 @@ def generate_dataset():
                 
             aux = aux +1
 
-            write_dataset_csv('dataset_sem_observador_mapa_'+mp.filename+'.csv', data_io)
+            write_dataset_csv('dataset_sem_observador_mapa_'+str(mp.id_map)+'.csv', data_io)
         print('Tempo: ' + str(process_time() - start_time) + ' segundos')
         
 
