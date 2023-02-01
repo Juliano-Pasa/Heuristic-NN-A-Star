@@ -33,7 +33,7 @@ class Mde:
     def __init__(self, fp, reduction_factor):
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
-        self.pixel_resolution = self.dataset.transform[0]
+        self.pixel_resolution = GenerateVars.pixel_resolution #round(self.dataset.transform[0] * 108000)
         self.h_limit = self.dataset.height
         self.w_limit = self.dataset.width
 
@@ -598,7 +598,8 @@ def generate_dataset():
     sample_coords = generate_sample_points(GenerateVars.sampling_rate/100,rows=300,collumns=300) # Gera os pontos de amostra
     #
     #   MUDAR ROWS E COLLUMNS DE ACORDO COM O TAMANHO DO MAPA
-    #
+    #   
+    
 
 
     count=0
@@ -627,7 +628,7 @@ def generate_dataset():
             source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             b = 0 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
             C = cuda_safe_sssp_without_S(V, E, W, source, b) # Gera o mapa de custos
-
+            
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
             for dest_coords in sample_coords[aux+1:]:
                 dest = get_id_by_coords(dest_coords[0], dest_coords[1])
@@ -639,7 +640,8 @@ def generate_dataset():
                 str(int(dest_coords[0] * CELL_HEIGHT)), 
                 mde.grid[dest_coords[0], dest_coords[1]], 
                 C[dest]))
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                
             aux = aux +1
 
             write_dataset_csv('dataset_sem_observador_mapa_'+mp.filename+'.csv', data_io)
@@ -703,6 +705,7 @@ def generate_dataset_with_viewpoints():
             for dest_coords in sample_coords[aux+1:]:
                 dest = get_id_by_coords(dest_coords[0], dest_coords[1])
                 data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
                 #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
             aux = aux +1
 

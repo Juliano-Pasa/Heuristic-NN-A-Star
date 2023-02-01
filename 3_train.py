@@ -24,7 +24,7 @@ def model_l():
     optimizer = Adam(learning_rate=0.0001)
 
     model = tf.keras.Sequential([
-        Input(shape=(9,)),
+        Input(shape=(8,)), #tmn entrada
         Dense(400,activation='relu',kernel_initializer=initializer),
         Dense(500,activation='relu',kernel_initializer=initializer),
         Dense(400,activation='relu',kernel_initializer=initializer),
@@ -95,9 +95,9 @@ def train_dnn(model, n_batch, dataset, n_epochs_max=2000, patience=100, dir_log=
     # ---- Cálculo da quantidade de lotes de treinamento, teste e validação -------- #
     # Alterar manualmente se necessário
 
-    map_size = 200 ** 2 # tamanho do mapa
+    map_size = 300 ** 2 # tamanho do mapa
     sampling = 0.10     # amostragem por instância do mapa
-    num_maps = 100      # quantidade de instâncias
+    num_maps = 1      # quantidade de instâncias
     dataset_size = ((map_size * sampling) * (map_size * sampling -1) * num_maps) / 2
 
     # Quantidade de 'leituras' realizadas para passar pelo arquivo inteiro (1 por lote)
@@ -142,7 +142,7 @@ def main():
     # os.chdir(dataset_location)
 
     data_io_stats = io.StringIO()
-    stats_file_name = 'resultados_' + out_dir + '.csv'
+    stats_file_name = out_dir + '.csv'
 
     # Verifica se a GPU está ativada pro treinamento
     print(tf.config.experimental.list_physical_devices('GPU'))
@@ -150,7 +150,7 @@ def main():
     models = [model_l] # Lista de modelos, 1 modelo sendo treinado
 
     # Tamanho do lote de treinamento
-    batch_size = 1024 * 32
+    batch_size = 4096 * 64
 
     print('Treinamento iniciado')
     start = time.time()

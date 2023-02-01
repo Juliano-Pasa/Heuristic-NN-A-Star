@@ -39,7 +39,7 @@ def shuffle(file_in, file_out='out'):
 # Params: folder = diretório onde o dataset embaralhado segmentado está localizados
 #          train, test e val = % de divisão do dataset (70/15/15)
 #          Se NUM_OF_FILES = 100 -> 70 arquivos são unidos em um train_set.csv, 15 arquivos unidos em test_set.csv e 15 arquivos unidos em validation_set.csv
-def merge_train_test_validation(folder, train=0.7, test=0.15, val=0.15):
+def merge_train_test_validation(folder, train=0.7, test=0.20, val=0.10):
     isExist = os.path.exists("./dataset/")
     if not isExist:
         os.makedirs("./dataset/")
