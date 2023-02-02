@@ -419,7 +419,8 @@ def calcula_x(y,m,n):
     return (y+n)/m
 
 def line_of_sight1(s,s1,g):#original
-
+    if s is None or s1 is None:
+        return False, 10
     x0,y0 = s.get_coordinates()
     #print(x0,y0)
     x1,y1 = s1.get_coordinates()
@@ -503,14 +504,14 @@ def line_of_sight1(s,s1,g):#original
             if f>= dx:
                 if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     #print("ENTREI AQUI")
-                    return False
+                    return False, math.inf
                 y0 = y0 + sy
                 f = f - dx
 
             if f!=0 and calcula_angulo(vert_src, vert_tgt)>ANGULO_MAX:
-                return False
+                return False, math.inf
             if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>ANGULO_MAX:
-                return False
+                return False, math.inf
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
 
@@ -542,19 +543,19 @@ def line_of_sight1(s,s1,g):#original
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
                 if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
-                    return False
+                    return False, math.inf
                 
                 x0 = x0 + sx
                 f = f - dy
 
             if f != 0 and calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
-                return False
+                return False, math.inf
             
             
             if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>ANGULO_MAX:
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
-                return False
+                return False, math.inf
             y0 = y0 + sy
             #print("AAAAAAAAAAAAAAAAAA ",x0 + int((sx-1)/2),y0 + int((sy-1)/2))
             #print("cords",x0,y0)
@@ -1382,7 +1383,7 @@ def main():
             heuristic = heuristica_padrao
             t3 = time()
             
-            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta(g, source, dest, b, heuristic)
+            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta_custo_diferente(g, source, dest, b, heuristic)
             print("custo do theta: ",cost3)
             print("nodos visitados: ",count_visited3)
             print("nodos abertos: ",count_open3)
