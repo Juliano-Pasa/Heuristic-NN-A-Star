@@ -46,7 +46,8 @@ class Mde:
     def __init__(self, fp, reduction_factor):
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
-        self.pixel_resolution = round(self.dataset.transform[0] * 108000)
+        #self.pixel_resolution = round(self.dataset.transform[0] * 108000)#usado quando os pixeis estão em graus por metro
+        self.pixel_resolution =self.dataset.transform[0] #usado quando o dataset os m por pixel estão em m
         print("\n\n\n\n\nmetadados:", self.pixel_resolution)
 
         print("\n\n\n\n\nmetadados:",self.dataset.height)
@@ -405,8 +406,20 @@ def calcula_hipotenusa(vertex1,vertex2,g):
     hipotenusa = math.sqrt(distancia**2+altura**2)    
     return hipotenusa
 
+def calcula_custo_theta(vert1,vert2,multiplicador):
+    #multiplicador é um valor de 0~~1 que é relativo ao tanto que a linha cruzou pelo nodo
+    if vert1 is None or vert2 is None:
+        return False, math.inf
+    return True, r3_heuristic(vert1,vert2)*multiplicador
+
+def calcula_y(x,m,n):
+    return m*x-n
+
+def calcula_x(y,m,n):
+    return (y+n)/m
 
 def line_of_sight1(s,s1,g):#original
+
     x0,y0 = s.get_coordinates()
     #print(x0,y0)
     x1,y1 = s1.get_coordinates()
@@ -426,8 +439,8 @@ def line_of_sight1(s,s1,g):#original
     w=0
     
     #calcula o angulo aqui 
-    x_s,y_s = s.get_r2_coordinates()
-    x_s1,y_s1 = s1.get_r2_coordinates()
+    x_s,y_s = s.get_coordinates()
+    x_s1,y_s1 = s1.get_coordinates()
 
 
 
@@ -436,10 +449,16 @@ def line_of_sight1(s,s1,g):#original
     #  
 
     # m = tangente do angulo alfa
-    m = math.atan2(y_s1-y_s , x_s1-x_s)
+    if x_s1-x_s==0:
+        m=0
+    else:
+        m = (y_s1-y_s)/(x_s1-x_s)
 
     #substituimos um dos pontos na equação da reta para obter o N
     n = m*x_s - y_s
+
+    #if n != m*x_s1-y_s1:
+    #    print("Equação da reta está com incosistencias ",n , m*x_s1-y_s1)
 
     #agora que temos o n podemos calcular a reta em qualquer ponto dando o x e y como input
 
@@ -455,7 +474,7 @@ def line_of_sight1(s,s1,g):#original
     
     #                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),  # peso da aresta = distância Eclidiana no R3
     #                                     vertex.get_elevation(), vertex2.get_elevation())
-    
+    cost=0
     if dx >= dy:
         #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
         while x0 != x1:
@@ -468,8 +487,19 @@ def line_of_sight1(s,s1,g):#original
             #print("aaaaa vertex1 550",vert)
             #print("aaaaa vertex2 550",vert1)
             #print("vert1 e 2 peso", vert.get_edge_weight(vert1.get_id()))
+            if m == 0:
+                multiplicador=1
+            else:
+                x_mult = calcula_x(y0,m,n)
+                y_mult = calcula_y(x0,m,n)
+                multiplicador = r2_distance(x0,x_mult,y0,y_mult)
+            flag, valor = calcula_custo_theta(vert_src,vert_tgt,multiplicador)
+            if(flag):
+                cost = cost + valor
+
+
             
-            idinicial=get_id_by_coords(x0,y0)
+            #idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
                 if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     #print("ENTREI AQUI")
@@ -483,6 +513,9 @@ def line_of_sight1(s,s1,g):#original
                 return False
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
+
+
+
             #cost = cost + g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2)).get_edge_weight(idinicial)
     else:
         #cost = cost + (g.get_vertex(get_id_by_coords(x1,y1)).get_elevation()/2)
@@ -493,6 +526,17 @@ def line_of_sight1(s,s1,g):#original
             #y0 + int((sy-1)/2) = y0 + int((sy-1)/2)
             vert_src = g.get_vertex_by_coords(x0,y0)
             vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+
+            if m == 0:
+                multiplicador=1
+            else:
+                x_mult = calcula_x(y0,m,n)
+                y_mult = calcula_y(x0,m,n)
+                multiplicador = r2_distance(x0,x_mult,y0,y_mult)
+            flag, valor = calcula_custo_theta(vert_src,vert_tgt,multiplicador)
+            if(flag):
+                cost = cost + valor
+
             #print("aaaaa vertex1 550",vert)
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
@@ -546,7 +590,102 @@ def CalculateCostNonUniform(child,current,grid):
         cost = g1
     return (cost , parent)
 
+def theta_custo_diferente(g, start, goal, v_weight, heuristic):
+    opened = []
+    expanded = []
 
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + r3_heuristic(start, goal)
+
+    opened = [(start, hscore)]
+
+    count_visited = 0
+    count_open = 1
+    
+    i=0
+    i+=1
+    best=math.inf
+    while len(opened):
+        best=math.inf
+        for i in range(len(opened)):
+            x,y = opened[i]
+            if y<best:
+                best=y
+                save=i
+                    
+        uv = opened[save]
+        current = uv[0]
+        del opened[save]
+        expanded.append(current)
+        count_open += 1
+
+        if current == goal:
+            distance = current.get_distance()
+            path = []
+            path.append(goal.get_coordinates())
+            count_visited=1
+            print("salvando o path\n")
+            while current.get_id() != start.get_id():
+                path.append(current.get_coordinates())
+                current = current.get_previous()
+                count_visited+=1
+            path.append(current.get_coordinates())
+            closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
+            return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
+        
+        for next_id in current.get_neighbors():
+            
+            child = g.get_vertex(next_id)
+            if child not in expanded:               
+                
+                ind = 0
+                newborn = True
+                for ind in range(len(opened)):
+                    c, hs = opened[ind]
+                    if(c == child): 
+                        newborn = False
+
+                if newborn:
+                    child.set_distance(math.inf)
+                    child.set_previous(None)
+
+                grand_father = current.get_previous()
+                flag,cost =line_of_sight1(grand_father, child, g)
+                if grand_father is not None and flag:
+                    if grand_father.get_distance() + cost < child.get_distance():
+                        child.set_distance(grand_father.get_distance() + r3_heuristic(grand_father, child))
+                        child.set_previous(grand_father)
+                        
+                        #Ineficiente, refatorar com alguma built-in function
+                        ind = 0
+                        for ind in range(len(opened)):
+                            c, hs = opened[ind]
+                            if child == c:                            
+                                del opened[ind]
+                                break
+
+                        opened.append((child, child.get_distance() + cost)) # verificar
+                else:
+                    if current.get_distance() + r3_heuristic(current, child) < child.get_distance():
+                        child.set_distance(current.get_distance() + r3_heuristic(current, child))#substituir por edge cost? precisa deixar coerente.
+                        child.set_previous(current)
+
+                        #Ineficiente, refatorar com alguma built-in function
+                        ind = 0
+                        for ind in range(len(opened)):
+                            c, hs = opened[ind]
+                            if child == c:                            
+                                del opened[ind]
+                                break
+                        
+
+                        opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
 # A* adaptado com fator de segurança no cálculo do custo
 def theta(g, start, goal, v_weight, heuristic):
     opened = []
@@ -1191,8 +1330,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = pair[0]#pair[0](128,192)
-            dest_coords = pair[1]#pair[1](58,92)
+            src_coords = (128,192)#pair[0](128,192)
+            dest_coords = (58,92)#pair[1](58,92)
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
             #print("aaaa",source)
