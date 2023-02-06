@@ -46,8 +46,8 @@ class Mde:
     def __init__(self, fp, reduction_factor):
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
-        #self.pixel_resolution = round(self.dataset.transform[0] * 108000)#usado quando os pixeis estão em graus por metro
-        self.pixel_resolution =self.dataset.transform[0] #usado quando o dataset os m por pixel estão em m
+        self.pixel_resolution = round(self.dataset.transform[0] * 108000)#usado quando os pixeis estão em graus por metro
+        #self.pixel_resolution =self.dataset.transform[0] #usado quando o dataset os m por pixel estão em m
         print("\n\n\n\n\nmetadados:", self.pixel_resolution)
 
         print("\n\n\n\n\nmetadados:",self.dataset.height)
@@ -1257,6 +1257,7 @@ def main():
     data_io_comp = io.StringIO()
     data_io_comp2 = io.StringIO()
     data_io_comp3 = io.StringIO()
+    data_io_comp4 = io.StringIO()
     data_io_all = io.StringIO()
 
     # cabecalho dos arquivos csv, separador utilizado é o ';'
@@ -1266,26 +1267,31 @@ def main():
     #data_io_visited.write("""y;x\n""")
     #data_io_opened.write("""y;x\n""")
 
-    data_io_time_cost_dnn1.write("""y;x\n""")
-    data_io_visited_cost_dnn1.write("""y;x\n""")
-    data_io_time_cost_dnn2.write("""y;x\n""")
-    data_io_visited_cost_dnn2.write("""y;x\n""")
-    data_io_comp.write("""dist_a;vis_a;cost_a;dist_b;vis_b;cost_b;dist_c;vis_c;cost_c;dist_d;vis_d;cost_d;time_a;time_b;time_c;time_d;visited_a;visited_b;visited_c;visited_d;len_a;len_b;len_c;len_d;count_visible_a;count_visible_b;count_visible_c;count_visible_d\n""")
-    data_io_comp2.write("""dist_a;vis_a;cost_a;dist_b;vis_b;cost_b;dist_c;vis_c;cost_c;dist_d;vis_d;cost_d;time_a;time_b;time_c;time_d;visited_a;visited_b;visited_c;visited_d;len_a;len_b;len_c;len_d;count_visible_a;count_visible_b;count_visible_c;count_visible_d\n""")
-    data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
+    #data_io_time_cost_dnn1.write("""y;x\n""")
+   # data_io_visited_cost_dnn1.write("""y;x\n""")
+    #data_io_time_cost_dnn2.write("""y;x\n""")
+    #data_io_visited_cost_dnn2.write("""y;x\n""")
+    data_io_comp.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+    data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+    data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+    data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+    #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
     if not os.path.exists("./DADOS_RESULTADOS/"):
         os.makedirs("./DADOS_RESULTADOS/")
 
-    write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
-    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
-    write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
-    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
-    write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
-    write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
-    write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)#Talvez 2
-    write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
-    write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+    #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
+   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
+    #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
+   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
+   # write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
+   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
+    write_dataset_csv('./DADOS_RESULTADOS/A_star.csv', data_io_comp)
+    write_dataset_csv('./DADOS_RESULTADOS/A_star_mod.csv', data_io_comp2)
+    write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
+    write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
+   # write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+    #write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
     teste=False
     # Realiza o mesmo processo para cada observador
     print(len(viewpoints))
@@ -1331,8 +1337,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = (128,192)#pair[0](128,192)
-            dest_coords = (58,92)#pair[1](58,92)
+            src_coords = pair[0]#pair[0](128,192)
+            dest_coords = pair[1]#pair[1](58,92)
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
             #print("aaaa",source)
@@ -1432,10 +1438,10 @@ def main():
             #data_io_time_cost_dnn2.write("""%s;%s\n""" % (t4, cost4))
             #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
 
-            data_io_comp.write("""%s;%s;%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
-            data_io_comp2.write("""%s;%s;%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
-            data_io_comp3.write("""%s;%s;%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
-            data_io_comp4.write("""%s;%s;%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
+            data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
+            data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
+            data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+            data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
             
 
             if teste:
@@ -1479,16 +1485,16 @@ def main():
             #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
             #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
         write_dataset_csv('./DADOS_RESULTADOS/A_star.csv', data_io_comp)
-        write_dataset_csv('./DADOS_RESULTADOS/A_star_mod.csv', data_io_comp)
-        write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp)
-        write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_mod.csv', data_io_comp2)
+        write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
         #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
        # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
         #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
         #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
         #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
         #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
-        write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
+        #write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
         #write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
 
         print('Tempo: ' + str(time() - start_time) + ' segundos')
