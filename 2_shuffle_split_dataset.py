@@ -4,6 +4,7 @@ import sys
 import os
 import numpy
 from tqdm import tqdm
+from config_variables import ShuffleVars
 import csv
 import glob
 from time import process_time
@@ -100,16 +101,16 @@ def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
 def main():
     #args = sys.argv
     #f_in = args[1]  # .csv contendo os dados do dataset
-    f_in = ['./datasets_separados/tst.csv', './datasets_separados/tst2.csv',  './datasets_separados/tst3.csv']
+    files_inputs = ['./datasets_separados/tst.csv', './datasets_separados/tst2.csv',  './datasets_separados/tst3.csv']
 
     isExist = os.path.exists("./out/")
     if not isExist:
         os.makedirs("./out/")
 
-    shuffle_many(f_in)   # Embaralha o dataset e salva em N arquivos separados em direstório "./out/" (NUM_OF_FILES)
+    shuffle_many(files_inputs)   # Embaralha o dataset e salva em N arquivos separados em direstório "./out/" (NUM_OF_FILES)
 
-    #for file_input in files_inputs
-    #os.remove(f_in) # Remove o arquivo original (opcional, depende da disponibilidade de espaço no disco)
+    #for file_input in files_inputs:
+    #    os.remove(file_input) # Remove o arquivo original (opcional, depende da disponibilidade de espaço no disco)
 
     merge_train_test_validation('out')  # Combina as partições embaralhadas criadas em arquivos de treinamento, teste e validação
 

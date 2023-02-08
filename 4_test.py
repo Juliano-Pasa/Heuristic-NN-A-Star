@@ -8,6 +8,7 @@ import csv
 import heapq
 import os
 import glob
+from config_variables import TestVars, TestCase 
 import matplotlib.image as mpimg
 from time import time
 from time import process_time
@@ -1292,7 +1293,7 @@ def main():
     write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
    # write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
     #write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
-    teste=True
+    teste= TestVars.test
     # Realiza o mesmo processo para cada observador
     print(len(viewpoints))
     for vp in viewpoints:
