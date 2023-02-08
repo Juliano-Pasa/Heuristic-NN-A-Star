@@ -24,7 +24,7 @@ def model_l():
     optimizer = Adam(learning_rate=0.0001)
 
     model = tf.keras.Sequential([
-        Input(shape=(8,)), #tmn entrada
+        Input(shape=(7,)), #tmn entrada
         Dense(400,activation='relu',kernel_initializer=initializer),
         Dense(500,activation='relu',kernel_initializer=initializer),
         Dense(400,activation='relu',kernel_initializer=initializer),
@@ -35,7 +35,7 @@ def model_l():
     return model
 
 # Generator necessário para treinamento em memória externa, caso o dataset não couber na memória principal
-def dataset_generator(filename, batch_size, n_entries=9):
+def dataset_generator(filename, batch_size, n_entries=7):
     csvfile = open(filename)
     # chunksize define a quantidade de linhas do dataset que serão lidos em conjunto
     # chunksize = batch_size -> lê um lote do disco por vez, pode ser lido mais de um lote, mas precisa de mais um laço, 1 yield por batch
