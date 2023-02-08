@@ -1213,7 +1213,7 @@ def main():
     model_name1 = 'model_1_10.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
     #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
-    reduction_factor = 2 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
+    reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
     # Lê o arquivo do MDE e cria o grid do mapa
     mde = Mde(filename, reduction_factor)
@@ -1292,7 +1292,7 @@ def main():
     write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
    # write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
     #write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
-    teste=False
+    teste=True
     # Realiza o mesmo processo para cada observador
     print(len(viewpoints))
     for vp in viewpoints:
@@ -1337,8 +1337,8 @@ def main():
         # ----------------------------------------------------------- #
         # Itera nos N pares de origem e destino
         for pair in combinations:
-            src_coords = pair[0]#pair[0](128,192)
-            dest_coords = pair[1]#pair[1](58,92)
+            src_coords = (128,192) #pair[0](128,192)
+            dest_coords = (58,92) #pair[1](58,92)
             source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
             source = g.get_vertex(source_id)
             #print("aaaa",source)
