@@ -2,6 +2,7 @@ import random
 import io
 import sys
 import os
+import numpy
 from tqdm import tqdm
 import csv
 import glob
@@ -9,22 +10,49 @@ from time import process_time
 
 # Código para embaralhar uma quantidade grande de dados que não cabem em memória
 # Fonte: https://stackoverflow.com/a/62566435
-def shuffle(file_in, file_out='out'):
+def sort_indexes(start, end):
+    array = list(numpy.arange(start, end))
+    random.shuffle(array)   
+    return array
+
+def shuffle_many(files, file_out='out'):
+    map_count = len(files)
     file_out = './out/' + file_out
     files_out = []
 
-    NUM_OF_FILES = 2_00 # Quantidade de fragmentos do arquivo .csv original
+    NUM_OF_FILES = 20 # Quantidade de fragmentos do arquivo .csv original
+
 
     for i in range(NUM_OF_FILES):
         f_ = file_out + str(i) + '.csv'
         files_out.append(io.open(f_, 'w', encoding='utf-8'))
 
-    with io.open(file_in, 'r', encoding='utf-8') as source:
-        for f in tqdm(source):
-            files_out[random.randint(0, NUM_OF_FILES - 1)].write(f)
-        for i in range(NUM_OF_FILES):
-            files_out[i].close()
-
+    #Abre os filepointers
+    file_pointers = []
+    for f in files:
+        file_pointers.append(io.open(f, 'r', encoding='utf-8'))
+        
+    line_counter = 0
+    file_lines_number = 100
+    indexes = list()
+    while line_counter < file_lines_number:
+        if(len(indexes) == 0):
+            indexes = sort_indexes(0,20)
+        chosen_file_out = indexes.pop(0)
+        lines = []
+        for pointer in file_pointers:
+            files_out[chosen_file_out].write(pointer.readline())
+        line_counter += 1 
+            
+    #Fecha os filepointers (File inputs)
+    for i in range(map_count):
+        file_pointers[i].__exit__()
+        
+    #Fecha os filepointers (File outputs)
+    for i in range(NUM_OF_FILES):
+        files_out[i].close()
+        
+    #Embaralha os dados dentro dos próprios arquivos gerados
     for i in range(NUM_OF_FILES):
         f_ = file_out + str(i) + '.csv'
         data = []
@@ -33,13 +61,14 @@ def shuffle(file_in, file_out='out'):
         data.sort()
         with io.open(f_, 'w', encoding='utf-8') as file:
             for _, line in tqdm(data):
-                file.write(line)
+                file.write(line)                
+        
 
 # Junta os N .csv da etapa de shuffle em 3 arquivos de treinamento, teste e validação
 # Params: folder = diretório onde o dataset embaralhado segmentado está localizados
 #          train, test e val = % de divisão do dataset (70/15/15)
 #          Se NUM_OF_FILES = 100 -> 70 arquivos são unidos em um train_set.csv, 15 arquivos unidos em test_set.csv e 15 arquivos unidos em validation_set.csv
-def merge_train_test_validation(folder, train=0.7, test=0.20, val=0.10):
+def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
     isExist = os.path.exists("./dataset/")
     if not isExist:
         os.makedirs("./dataset/")
@@ -69,28 +98,30 @@ def merge_train_test_validation(folder, train=0.7, test=0.20, val=0.10):
         count = count + 1
 
 def main():
-    args = sys.argv
-    f_in = args[1]  # .csv contendo os dados do dataset
+    #args = sys.argv
+    #f_in = args[1]  # .csv contendo os dados do dataset
+    f_in = ['./datasets_separados/tst.csv', './datasets_separados/tst2.csv',  './datasets_separados/tst3.csv']
 
     isExist = os.path.exists("./out/")
     if not isExist:
         os.makedirs("./out/")
 
-    shuffle(f_in)   # Embaralha o dataset e salva em N arquivos separados em direstório "./out/" (NUM_OF_FILES)
+    shuffle_many(f_in)   # Embaralha o dataset e salva em N arquivos separados em direstório "./out/" (NUM_OF_FILES)
 
-    os.remove(f_in) # Remove o arquivo original (opcional, depende da disponibilidade de espaço no disco)
+    #for file_input in files_inputs
+    #os.remove(f_in) # Remove o arquivo original (opcional, depende da disponibilidade de espaço no disco)
 
     merge_train_test_validation('out')  # Combina as partições embaralhadas criadas em arquivos de treinamento, teste e validação
 
-    # Remove as partições criadas
-    files = glob.glob('./out/*.csv')
-    for f in files:
-        try:
-            os.remove(f)
-        except OSError as e:
-            print("Error: %s : %s" % (f, e.strerror))
+    #Remove as partições criadas
+    #files = glob.glob('./out/*.csv')
+    #for f in files:
+    #    try:
+    #        os.remove(f)
+    #    except OSError as e:
+    #        print("Error: %s : %s" % (f, e.strerror))
 
-    os.rmdir('out')
+    #os.rmdir('out')
 
 if __name__ == "__main__":
     main()
