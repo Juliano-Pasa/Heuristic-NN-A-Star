@@ -664,7 +664,7 @@ def generate_dataset():
                 
             aux = aux +1
 
-            write_dataset_csv('dataset_sem_observador_mapa_'+str(mp.id_map)+'.csv', data_io)
+            write_dataset_csv('dataset_sem_observador_mapa_\\'+str(mp.id_map)+'.csv', data_io)
         print('Tempo: ' + str(process_time() - start_time) + ' segundos')
         
 
