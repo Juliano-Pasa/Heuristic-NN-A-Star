@@ -26,7 +26,7 @@ class TestVars:
     filename = ".\\recorte400x400.tif"
     dnn_model_name = "modelo_249_epocas.hdf5"
     dnn_model_with_observer_name = "model_100_10.hdf5"
-    reduction_factor = 2
+    reduction_factor = 1
     use_dnn = True
     use_observer = True
 
@@ -59,12 +59,12 @@ class GenerateVars:
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"
     maps = [
-        MapCase(1, "\\recorte300x300A.tif", 30),
-        MapCase(2, "\\recorte300x300B.tif", 30),
-        MapCase(3, "\\recorte300x300C.tif", 30),
-        MapCase(4, "\\recorte300x300D.tif", 30),
-        MapCase(5, "\\recorte300x300E.tif", 30),
-        MapCase(6, "\\recorte300x300F.tif", 30),
-        MapCase(7, "\\recorte300x300G.tif", 30),
-        MapCase(8, "\\recorte300x300H.tif", 30)
+        MapCase(1, "\\recorte300x300A.tif", 30)#,
+        #MapCase(2, "\\recorte300x300B.tif", 30),
+        #MapCase(3, "\\recorte300x300C.tif", 30),
+        #MapCase(4, "\\recorte300x300D.tif", 30),
+        #MapCase(5, "\\recorte300x300E.tif", 30),
+        #MapCase(6, "\\recorte300x300F.tif", 30),
+        #MapCase(7, "\\recorte300x300G.tif", 30),
+        #MapCase(8, "\\recorte300x300H.tif", 30)
     ]

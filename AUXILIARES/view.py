@@ -106,14 +106,14 @@ def aplica_visited_rgb(rgb, visited):
     return rgb
 
 # Desenha a superfície a partir do PNG do terreno
-def draw_surface(file, projection, alt_diff):
+def draw_surface(file, projection, alt_diff, size):
     plt.rcParams["figure.autolayout"] = False
     img = mpimg.imread(file)
 
     # ALTURA DAS COORDENADAS <- MDE (COLORAÇÃO DO PNG DO FILE)
     z = img[:, :, :-1] * alt_diff
 
-    visited = open_csv('../DADOS_RESULTADOS/opened.csv')
+    visited = open_csv('../DADOS_RESULTADOS/opened3.csv')
     viewshed = mpimg.imread(projection)
 
     # ------------------------ PLOT SUPERFICIE --------------------------- #
@@ -129,7 +129,7 @@ def draw_surface(file, projection, alt_diff):
     vals[:, 2] = np.linspace(50 / 256, 0.6, N)
     newcmp = ListedColormap(vals)
     ls = LightSource(azdeg=0, altdeg=65)
-    rgb = ls.shade(np.array(img[:,:,0]).reshape((200,200)), cmap=newcmp)
+    rgb = ls.shade(np.array(img[:,:,0]).reshape((size,size)), cmap=newcmp)
 
     # rgb = aplica_viewshed_rgb(rgb, viewshed)  # Descomentar para ilustrar a visibilidade do observador
     rgb = aplica_visited_rgb(rgb, visited)      # Descomentar para projetar os nodos abertos
@@ -155,7 +155,7 @@ def draw_surface(file, projection, alt_diff):
 
     # ---------------------------------------- CAMINHO ---------------------------------------------------------- #
     # marca as coordenadas percorridas
-    path = open_csv('../DADOS_RESULTADOS/visited.csv')
+    path = open_csv('../DADOS_RESULTADOS/visited3.csv')
     # path = []
     # Pontos do caminho
     for i, cell in enumerate(path):
@@ -213,13 +213,15 @@ def open_csv(f):
       return list_of_rows
 
 def main():
+    print ("\n\nExecute o codigo com $python .\\view.py mapa.tif tamanho_do_mapa f\n exemplo $python .\\view.py recorte300x300A.tif 300\n\n")
     args = sys.argv
 
     filename = args[1]
-    viewshed = '../VIEWSHEDS/VIEWSHED_4_11.png'
+    tamanho = args[2]
+    viewshed = '../VIEWSHEDS/VIEWSHED_97_7.png'
 
     #Dimensão em pixels da area do nodo = reduction_factor X reduction_factor
-    reduction_factor = int(args[2])
+    reduction_factor = 1
     mde = Mde(filename, reduction_factor)
 
     max_alt = mde.grid.max()
@@ -233,7 +235,7 @@ def main():
     tif_to_png(np.array(mde.grid), 'terrain.png')
 
     # Desenha a projeção do terreno
-    draw_surface('terrain.png', viewshed, diff)
+    draw_surface('terrain.png', viewshed, diff,int(tamanho))
 
 if __name__ == '__main__':
     main()
