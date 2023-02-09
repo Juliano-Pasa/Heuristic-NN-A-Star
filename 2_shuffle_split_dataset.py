@@ -3,11 +3,13 @@ import io
 import sys
 import os
 import numpy
+from config_variables import GenerateVars
 from tqdm import tqdm
-from config_variables import ShuffleVars
 import csv
 import glob
-from time import process_time
+from time import process_time# import module
+import pandas as pd
+  
 
 # Código para embaralhar uma quantidade grande de dados que não cabem em memória
 # Fonte: https://stackoverflow.com/a/62566435
@@ -20,8 +22,13 @@ def shuffle_many(files, file_out='out'):
     map_count = len(files)
     file_out = './out/' + file_out
     files_out = []
+    
+    #Descobrindo tamanho do mapa
+    #map = pd.read_csv(files[0])
+    #file_lines_number = len(map)
+    file_lines_number = 40423535 #ALTERAR
 
-    NUM_OF_FILES = 20 # Quantidade de fragmentos do arquivo .csv original
+    NUM_OF_FILES = 200 # Quantidade de fragmentos do arquivo .csv original
 
 
     for i in range(NUM_OF_FILES):
@@ -34,11 +41,10 @@ def shuffle_many(files, file_out='out'):
         file_pointers.append(io.open(f, 'r', encoding='utf-8'))
         
     line_counter = 0
-    file_lines_number = 100
     indexes = list()
     while line_counter < file_lines_number:
         if(len(indexes) == 0):
-            indexes = sort_indexes(0,20)
+            indexes = sort_indexes(0,map_count)
         chosen_file_out = indexes.pop(0)
         lines = []
         for pointer in file_pointers:
@@ -77,7 +83,7 @@ def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
     extension = 'csv'
     all_filenames = [i for i in glob.glob('./'+folder+'/*.{}'.format(extension))]
     train_size = len(all_filenames) * train
-    test_size = train_size + len(all_filenames) * test
+    test_size = len(all_filenames) * test
     count = 0
     for file in all_filenames:
         start = process_time()
@@ -86,7 +92,7 @@ def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
             f_csv = csv.reader(f)
             if count < train_size:
                 out_file = './dataset/train_set.csv'
-            elif count < test_size:
+            elif count < (train_size + test_size):
                 out_file = './dataset/test_set.csv'
             else:
                 out_file = './dataset/validation_set.csv'
@@ -101,7 +107,12 @@ def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
 def main():
     #args = sys.argv
     #f_in = args[1]  # .csv contendo os dados do dataset
-    files_inputs = ['./datasets_separados/tst.csv', './datasets_separados/tst2.csv',  './datasets_separados/tst3.csv']
+    
+    
+    files_inputs = []
+    files_dir = GenerateVars.files_dir    
+    for map in GenerateVars.maps:
+        files_inputs.append(files_dir + str(map.id_map) + ".csv")
 
     isExist = os.path.exists("./out/")
     if not isExist:
