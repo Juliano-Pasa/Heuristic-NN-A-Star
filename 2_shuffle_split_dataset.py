@@ -44,7 +44,7 @@ def shuffle_many(files, file_out='out'):
     indexes = list()
     while line_counter < file_lines_number:
         if(len(indexes) == 0):
-            indexes = sort_indexes(0,map_count)
+            indexes = sort_indexes(0,NUM_OF_FILES)
         chosen_file_out = indexes.pop(0)
         lines = []
         for pointer in file_pointers:
@@ -75,7 +75,7 @@ def shuffle_many(files, file_out='out'):
 # Params: folder = diretório onde o dataset embaralhado segmentado está localizados
 #          train, test e val = % de divisão do dataset (70/15/15)
 #          Se NUM_OF_FILES = 100 -> 70 arquivos são unidos em um train_set.csv, 15 arquivos unidos em test_set.csv e 15 arquivos unidos em validation_set.csv
-def merge_train_test_validation(folder, train=0.70, test=0.20, val=0.10):
+def merge_train_test_validation(folder, train=0.70, test=0.15, val=0.15):
     isExist = os.path.exists("./dataset/")
     if not isExist:
         os.makedirs("./dataset/")
