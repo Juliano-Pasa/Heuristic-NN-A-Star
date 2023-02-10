@@ -213,12 +213,12 @@ def open_csv(f):
       return list_of_rows
 
 def main():
-    print ("\n\nExecute o codigo com $python .\\view.py mapa.tif tamanho_do_mapa f\n exemplo $python .\\view.py recorte300x300A.tif 300\n\n")
+    print ("\n\nExecute o codigo com $python .\\view.py mapa.tif tamanho_do_mapa \n exemplo $python .\\view.py recorte300x300A.tif 300\n\n")
     args = sys.argv
 
     filename = args[1]
     tamanho = args[2]
-    viewshed = '../VIEWSHEDS/VIEWSHED_97_7.png'
+    viewshed = '../VIEWSHEDS/VIEWSHED_30_8.png'
 
     #Dimensão em pixels da area do nodo = reduction_factor X reduction_factor
     reduction_factor = 1

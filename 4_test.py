@@ -744,12 +744,13 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
             grand_father = current.get_previous()
             flag,cost =line_of_sight1(grand_father, next, g)
             if grand_father is not None and flag:
+                '''r3_heuristic(grand_father,next)'''
                 if grand_father.get_distance() + cost < next.get_distance():
                     next.set_distance(grand_father.get_distance() + cost)
                     next.set_previous(grand_father)
                     
-                    hscore = new_dist + cost
-
+                    hscore = next.get_distance() + r3_heuristic(next,goal)
+                    #hscore = next.get_distance() + r3_heuristic(grandfather,next)
                     if not next.visited:
                         heapq.heappush(unvisited_queue, (hscore, next))
                         count_open = count_open + 1
@@ -759,7 +760,7 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
                 next.set_distance(new_dist)
                 next.set_risk(new_risk)
 
-                hscore = new_dist + heuristic(next, goal)
+                hscore = next.get_distance() + heuristic(next, goal)
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -814,7 +815,7 @@ def theta(g, start, goal, v_weight, heuristic):
                 count_visited+=1
             path.append(current.get_coordinates())
             closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
-            return current.get_distance(), count_visited, count_open, closed_nodes, path, distance
+            return closed_nodes, len(path), count_open, path, distance
         
         for next_id in current.get_neighbors():
             
@@ -1231,6 +1232,11 @@ def write_dataset_csv(filename, data_io):
         data_io.seek(0)
         shutil.copyfileobj(data_io, file)
 
+def write_dataset_test_csv(filename, data_io):
+    with open(filename, 'w') as file:
+        data_io.seek(0)
+        shutil.copyfileobj(data_io, file)
+
 
 # Gera e salva os mapas de visibilidade em arquivos png
 def save_viewsheds(grid, viewpoints, view_radius, viewpoint_height):
@@ -1534,7 +1540,7 @@ def main():
             dest = g.get_vertex(dest_id)
             global dnn_heuristic_dict1
             global dnn_heuristic_dict2
-            
+            print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
             #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
             
             dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
@@ -1645,32 +1651,32 @@ def main():
                 for i in range(len(visited1)):
                     data_io_visited.write("""%s\n"""%str((visited1[i])))
 
-                write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
-                write_dataset_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
+                write_dataset_test_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+                write_dataset_test_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
                 
                 for i in range(len(opened2)):
                     data_io_opened2.write("""%s\n"""%str((opened2[i])))
                 for i in range(len(visited2)):
                     data_io_visited2.write("""%s\n"""%str((visited2[i])))
 
-                write_dataset_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
-                write_dataset_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
+                write_dataset_test_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
+                write_dataset_test_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
                 
                 for i in range(len(opened3)):
                     data_io_opened3.write("""%s\n"""%str((opened3[i])))
                 for i in range(len(visited3)):
                     data_io_visited3.write("""%s\n"""%str((visited3[i])))
 
-                write_dataset_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
-                write_dataset_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)
+                write_dataset_test_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
+                write_dataset_test_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)
                 
                 for i in range(len(opened4)):
                     data_io_opened4.write("""%s\n"""%str((opened4[i])))
                 for i in range(len(visited4)):
                     data_io_visited4.write("""%s\n"""%str((visited4[i])))
 
-                write_dataset_csv('./DADOS_RESULTADOS/visited4.csv',data_io_visited4)
-                write_dataset_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
+                write_dataset_test_csv('./DADOS_RESULTADOS/visited4.csv',data_io_visited4)
+                write_dataset_test_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
                 break
 
 

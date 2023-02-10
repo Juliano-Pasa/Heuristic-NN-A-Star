@@ -60,13 +60,13 @@ class GenerateVars:
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"
     maps = [
-        MapCase(1, "\\recorte300x300A.tif", 30),
-        MapCase(2, "\\recorte300x300B.tif", 30),
-        MapCase(3, "\\recorte300x300C.tif", 30),
-        MapCase(4, "\\recorte300x300D.tif", 30),
-        MapCase(5, "\\recorte300x300E.tif", 30),
-        MapCase(6, "\\recorte300x300F.tif", 30),
-        MapCase(7, "\\recorte300x300G.tif", 30),
-        MapCase(8, "\\recorte300x300H.tif", 30)
+        #MapCase(1, "\\recorte300x300A.tif", 30),
+        MapCase(2, "\\recorte300x300B.tif", 30)
+        #MapCase(3, "\\recorte300x300C.tif", 30),
+        #MapCase(4, "\\recorte300x300D.tif", 30),
+        #MapCase(5, "\\recorte300x300E.tif", 30),
+        #MapCase(6, "\\recorte300x300F.tif", 30),
+        #MapCase(7, "\\recorte300x300G.tif", 30),
+       # MapCase(8, "\\recorte300x300H.tif", 30)
     ]    
     files_dir = ".\\dataset_sem_observador_mapa_\\"
