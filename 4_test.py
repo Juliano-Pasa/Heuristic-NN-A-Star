@@ -47,8 +47,8 @@ class Mde:
     def __init__(self, fp, reduction_factor):
         self.dataset = self.rasterio.open(fp)
         self.band1 = self.dataset.read(1)
-        #self.pixel_resolution = round(self.dataset.transform[0] * 108000)#usado quando os pixeis estão em graus por metro
-        self.pixel_resolution =self.dataset.transform[0] #usado quando o dataset os m por pixel estão em m
+        self.pixel_resolution = round(self.dataset.transform[0] * 108000)#usado quando os pixeis estão em graus por metro
+        #self.pixel_resolution =self.dataset.transform[0] #usado quando o dataset os m por pixel estão em m
         print("\n\n\n\n\nmetadados:", self.pixel_resolution)
 
         print("\n\n\n\n\nmetadados:",self.dataset.height)
@@ -596,6 +596,7 @@ def backtracking(final,start):
     path=[]
     while final.get_id() != start.get_id():
         path.append(final.get_coordinates())
+        #print("aqui",final.get_coordinates())
         final = final.get_previous()
     path.append(final.get_coordinates())
     return path
@@ -729,7 +730,7 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
             path=backtracking(current,start)
             
             #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
-            return current.get_distance(), len(path), count_open, len(visited), path, distance
+            return visited, len(path), count_open, path, distance
 
         current.set_visited(True)
         count_visited = count_visited + 1
@@ -950,7 +951,7 @@ def astar(g, start, goal, v_weight, heuristic):
             path=backtracking(current,start)
             
             #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
-            return current.get_distance(), len(path), count_open, len(visited), path, distance
+            return visited, len(path), count_open, path, distance
 
         current.set_visited(True)
         count_visited = count_visited + 1
@@ -1093,7 +1094,8 @@ def astarmod(g, start, goal, v_weight, heuristic):
             path=backtracking(current,start)
             
             #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
-            return current.get_distance(), len(path), count_open, len(visited), path, distance
+            return visited, len(path), count_open, path, distance
+        #distance2, count_visited2, count_open2, opened2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
 
         current.set_visited(True)
         count_visited = count_visited + 1
@@ -1542,7 +1544,7 @@ def main():
             #1) A* simples, heurística r3
             heuristic = r3_heuristic
             t1 = time()
-            distance1, count_visited1, count_open1, opened1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
             t1 = time() - t1
             path1 = [dest.get_id()]
             print("custo do a*: ",cost1)
@@ -1559,7 +1561,7 @@ def main():
             heuristic = r3_heuristic
             
             t2 = time()
-            distance2, count_visited2, count_open2, opened2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
+            opened2, count_visited2, count_open2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
             t2 = time() - t2
             print("custo do A* topografico: ",cost2)
             print("nodos visitados: ",count_visited2)
@@ -1576,7 +1578,8 @@ def main():
             heuristic = r3_heuristic
             
             t3 = time()
-            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
+            opened3, count_visited3, count_open3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
+            #return visited, len(path), count_open, path, distance
             t3 = time() - t3
             print("custo do theta: ",cost3)
             print("nodos visitados: ",count_visited3)
@@ -1596,7 +1599,7 @@ def main():
             #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
             heuristic = dict_dnn_heuristic1
             t4 = time()
-            distance4, count_visited4, count_open4, opened4, visited4, cost4 = astar(g, source, dest, b, heuristic)
+            opened4, count_visited4, count_open4, visited4, cost4 = astar(g, source, dest, b, heuristic)
             t4 = time() - t4
             path4 = [dest.get_id()]
             #count_visible4 = count_visible_nodes(dest, path4, 0)
@@ -1636,6 +1639,7 @@ def main():
 
             if teste:
                 teste=False
+                print("\n\n\n Quero ver ",opened1[0])
                 for i in range(len(opened1)):
                     data_io_opened.write("""%s\n"""%str((opened1[i])))
                 for i in range(len(visited1)):
