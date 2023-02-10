@@ -592,6 +592,14 @@ def CalculateCostNonUniform(child,current,grid):
         cost = g1
     return (cost , parent)
 
+def backtracking(final,start):
+    path=[]
+    while final.get_id() != start.get_id():
+        path.append(final.get_coordinates())
+        final = final.get_previous()
+    path.append(final.get_coordinates())
+    return path
+
 def theta_custo_diferente(g, start, goal, v_weight, heuristic):
     opened = []
     expanded = []
@@ -688,6 +696,75 @@ def theta_custo_diferente(g, start, goal, v_weight, heuristic):
                         
 
                         opened.append((child, child.get_distance() + r3_heuristic(child, goal))) # verificar
+                        
+def theta_rapido(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + heuristic(start, goal)
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    opened.append(start.get_coordinates())
+
+    while len(unvisited_queue):
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+        if current == goal:
+            #print("ÇOCORRO DEUS\n\n\n\n\n",visited)
+            #break
+            distance = current.get_distance()
+            path=[]
+            path=backtracking(current,start)
+            
+            #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
+            return current.get_distance(), len(path), count_open, len(visited), path, distance
+
+        current.set_visited(True)
+        count_visited = count_visited + 1
+        visited.append(current.get_coordinates())
+
+        for next_id in current.get_neighbors():
+            next = g.get_vertex(next_id)
+            new_dist = current.get_distance() + current.get_edge_weight(next_id)
+            new_risk = current.get_risk() + next.get_local_risk()
+            
+            grand_father = current.get_previous()
+            flag,cost =line_of_sight1(grand_father, next, g)
+            if grand_father is not None and flag:
+                if grand_father.get_distance() + cost < next.get_distance():
+                    next.set_distance(grand_father.get_distance() + cost)
+                    next.set_previous(grand_father)
+                    
+                    hscore = new_dist + cost
+
+                    if not next.visited:
+                        heapq.heappush(unvisited_queue, (hscore, next))
+                        count_open = count_open + 1
+                        opened.append(next.get_coordinates())
+            elif new_dist < next.get_distance():
+                next.set_previous(current)
+                next.set_distance(new_dist)
+                next.set_risk(new_risk)
+
+                hscore = new_dist + heuristic(next, goal)
+
+                if not next.visited:
+                    heapq.heappush(unvisited_queue, (hscore, next))
+                    count_open = count_open + 1
+                    opened.append(next.get_coordinates())
+    
 # A* adaptado com fator de segurança no cálculo do custo
 def theta(g, start, goal, v_weight, heuristic):
     opened = []
@@ -840,13 +917,6 @@ def theta(g, start, goal, v_weight, heuristic):
                 opened.remove((child, _)) # verificar
             opened.append(child, child.get_distance() + heuristic(child, goal)) # verificar'''
 
-def backtracking(final,start):
-    path=[]
-    while final.get_id() != start.get_id():
-        path.append(final.get_coordinates())
-        final = final.get_previous()
-    path.append(final.get_coordinates())
-    return path
 # A*
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -1483,7 +1553,7 @@ def main():
             print("tempo de duração: ", t1)
             g.reset()
 
-            print("terminou A*")
+            print("terminou A*\n")
 
             #2)A* adaptado, heuristica r3 e caculo de Angulos
             heuristic = r3_heuristic
@@ -1499,18 +1569,20 @@ def main():
             count_visible2 = count_visible_nodes(dest, path2, 0)
             path_len2 = len(path2)
             print("tempo de duração: ", t2)
+            print("Terminou A* topo\n")
             g.reset()
 
             #3)Theta* adaptado, heuristica r3 e calculo de angulo
-            heuristic = heuristica_padrao
+            heuristic = r3_heuristic
             
             t3 = time()
-            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta_custo_diferente(g, source, dest, b, heuristic)
+            distance3, count_visited3, count_open3, opened3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
             t3 = time() - t3
             print("custo do theta: ",cost3)
             print("nodos visitados: ",count_visited3)
             print("nodos abertos: ",count_open3)
             print("tempo de duração: ", t3)
+            print("Terminou theta\n")
             
             path3 = [dest.get_id()]
             count_visible3 = count_visible_nodes(dest, path3, 0)
@@ -1535,6 +1607,8 @@ def main():
             print("nodos abertos: ",count_open4)
             print("tempo de duração: ", t4)
             print("tempo do mapeamente heurístico: ", h_map_time1)
+            print("Terminou A* com dnn\n")
+            
             g.reset()
 
             data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
