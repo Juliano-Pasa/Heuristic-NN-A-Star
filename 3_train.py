@@ -150,7 +150,7 @@ def main():
     models = [model_l] # Lista de modelos, 1 modelo sendo treinado
 
     # Tamanho do lote de treinamento
-    batch_size = 64 * 4096
+    batch_size = 32
 
     print('Treinamento iniciado')
     start = time.time()
@@ -161,14 +161,18 @@ def main():
             t1_start = time.time()
             # Realiza o treinamento do modelo
             score, history = train_dnn(model, batch_size, dataset_location, n_epochs_max=100, patience=30, dir_log=out_dir+'/')
+            print(history.history.keys())
             t1_stop = time.time()
             diff_time = t1_stop - t1_start
 
+            data_io_stats.write("""%s,%s,%s,%s,%s\n""" % ('model',batch_size,history.history,diff_time,score))
+
+
             # Plotando acerto
-            plt.plot(history.history['accuracy'])
-            plt.plot(history.history['val_accuracy'])
-            plt.title("Accurracy of the Model")
-            plt.ylabel("Accuracy")
+            plt.plot(history.history['val_mean_absolute_percentage_error'])
+            plt.plot(history.history['val_mean_absolute_percentage_error'])
+            plt.title("Mean absolute percentage error of the Model")
+            plt.ylabel("Mean absolute percentage error")
             plt.xlabel("Epoch")
             plt.legend(["Train", "Val"], loc='upper left')
             plt.show()
@@ -181,9 +185,6 @@ def main():
             plt.xlabel("Epoch")
             plt.legend(["Train", "Val"], loc='upper left')
             plt.show()
-
-            data_io_stats.write("""%s,%s,%s,%s,%s\n""" % ('model',batch_size,history.history,diff_time,score))
-
             print(score)
     finally:
         total_training_time = time.time() - start
@@ -194,3 +195,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    #tfenv2
+    #python .\
