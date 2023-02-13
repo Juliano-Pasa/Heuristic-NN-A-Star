@@ -46,16 +46,36 @@ class MapCase:
         self.pixel_resolution = pixel_resolution #adaptar o código de geração para suportar
         self.reduction_factor = reduction_factor #adaptar o código de geração para suportar
 
+class VPCase:
+    def __init__(self, id_vp, x, y):
+        self.id_vp = id_vp
+        self.point = (x, y)
+
 class GenerateVars:   
 
     #Configurações gerais 
-    use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
+    use_viewpoints = True  #Não adaptado para suportar múltiplos mapas.
     sampling_rate = 10      # % da Amostragem
     pixel_resolution = 30   #adaptar o código de geração para usar somente o dos mapas
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"
-    vps_map = MapCase(1, "\\recorte400x400.tif", 30)
+    vps_map = MapCase(1, "\\recorte400x400.tif", 25)
+    
+    #Configuração para geração com vpconfigs
+    viewpoints = [
+        VPCase(1, 399, 300),
+        VPCase(2, 10, 10),
+        VPCase(4, 200, 200),
+        VPCase(8, 100, 100),
+        VPCase(16, 300, 100),
+        VPCase(32, 6, 6),
+        VPCase(64, 7, 7),
+        VPCase(128, 8, 8),
+        VPCase(256, 9, 9),
+        VPCase(512, 10, 10)
+    ]
+    vpconfigs = [31, 10, 12] #codigo de id
 
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"
