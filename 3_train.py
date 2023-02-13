@@ -6,6 +6,7 @@ import shutil
 import time
 import io
 import glob
+import matplotlib.pyplot as plt
 from   sklearn.model_selection       import train_test_split
 
 import tensorflow                    as     tf
@@ -145,12 +146,11 @@ def main():
     stats_file_name = out_dir + '.csv'
 
     # Verifica se a GPU está ativada pro treinamento
-    print(tf.config.experimental.list_physical_devices('GPU'))
-
+    print(tf.config.list_physical_devices())
     models = [model_l] # Lista de modelos, 1 modelo sendo treinado
 
     # Tamanho do lote de treinamento
-    batch_size = 4096 * 64
+    batch_size = 32
 
     print('Treinamento iniciado')
     start = time.time()
@@ -160,12 +160,31 @@ def main():
 
             t1_start = time.time()
             # Realiza o treinamento do modelo
-            score, history = train_dnn(model, batch_size, dataset_location, n_epochs_max=300, patience=30, dir_log=out_dir+'/')
+            score, history = train_dnn(model, batch_size, dataset_location, n_epochs_max=100, patience=30, dir_log=out_dir+'/')
+            print(history.history.keys())
             t1_stop = time.time()
             diff_time = t1_stop - t1_start
 
             data_io_stats.write("""%s,%s,%s,%s,%s\n""" % ('model',batch_size,history.history,diff_time,score))
 
+
+            # Plotando acerto
+            plt.plot(history.history['val_mean_absolute_percentage_error'])
+            plt.plot(history.history['val_mean_absolute_percentage_error'])
+            plt.title("Mean absolute percentage error of the Model")
+            plt.ylabel("Mean absolute percentage error")
+            plt.xlabel("Epoch")
+            plt.legend(["Train", "Val"], loc='upper left')
+            plt.show()
+            
+            # Plotando perda
+            plt.plot(history.history['loss'])
+            plt.plot(history.history['val_loss'])
+            plt.title("Loss of the Model")
+            plt.ylabel("Loss")
+            plt.xlabel("Epoch")
+            plt.legend(["Train", "Val"], loc='upper left')
+            plt.show()
             print(score)
     finally:
         total_training_time = time.time() - start
@@ -176,3 +195,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    #tfenv2
+    #python .\

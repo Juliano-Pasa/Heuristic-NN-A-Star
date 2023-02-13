@@ -270,6 +270,41 @@ def is_visible(grid, o_i, o_j, t_i, t_j, cell_size):
             return 0
         return 1
 
+def generate_viewshed_vpconfigs(grid, vps, fov_radius, cell_size, o_h):
+    global observer_height
+    observer_height = o_h
+    rows, cols = grid.shape
+
+    # Variável que armazena a visibilidade de cada pixel do mapa com valores de [0,1]
+    viewshed = np.zeros((rows, cols))
+
+    # Itera todas as células do grid, t_i = linha do "target", t_j = coluna do "target"
+    # e verifica se está oculta ou não
+    for (o_i, o_j) in vps:
+        for t_i in range(rows):
+            for t_j in range(cols):
+                # Célula do grid está fora de alcance do observador
+
+                dist = r2_distance(t_j, o_j, t_i, o_i)
+
+                # Célula alvo é a própria célula do observador -> totalmente visível
+                if t_j == o_j and t_i == o_i:
+                    viewshed[t_i, t_j] = 1
+                    continue
+
+                if t_j == o_j and t_i == o_i:
+                    print('obs')
+
+                # Célula alvo fora do alcance de visão do observador
+                elif dist > fov_radius:
+                    continue
+
+                else:
+                    viewshed[t_i, t_j] = is_visible(grid, o_i, o_j, t_i, t_j, cell_size)
+                    if viewshed[t_i, t_j]:
+                        viewshed[t_i, t_j] = (fov_radius - dist) / fov_radius
+
+    return viewshed
 
 # Função que recebe a matriz de elevação, a posição do observador,
 # o alcance do campo de visão e a largura das células do grid e retorna o viewshed
