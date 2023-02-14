@@ -709,7 +709,7 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    hscore = start.get_distance() + heuristic(start, goal)
+    hscore = visibility_weight * start.get_risk() + start.get_distance() + heuristic(start, goal)
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
@@ -725,7 +725,7 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
         if current == goal:
             #print("ÇOCORRO DEUS\n\n\n\n\n",visited)
             #break
-            distance = current.get_distance()
+            distance = current.get_distance() + visibility_weight * current.get_risk()
             path=[]
             path=backtracking(current,start)
             
@@ -742,25 +742,29 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
             new_risk = current.get_risk() + next.get_local_risk()
             
             grand_father = current.get_previous()
+            
+            grand_son_risk = new_risk + grand_father.get_risk() 
+            
             flag,cost =line_of_sight1(grand_father, next, g)
             if grand_father is not None and flag:
                 '''r3_heuristic(grand_father,next)'''
-                if grand_father.get_distance() + cost < next.get_distance():
+                if grand_father.get_distance() + cost + grand_son_risk * visibility_weight < next.get_distance() + visibility_weight * next.get_risk():
                     next.set_distance(grand_father.get_distance() + cost)
                     next.set_previous(grand_father)
+                    next.set_risk(grand_son_risk)
                     
-                    hscore = next.get_distance() + r3_heuristic(next,goal)
+                    hscore = visibility_weight * grand_son_risk + next.get_distance() + r3_heuristic(next,goal)
                     #hscore = next.get_distance() + r3_heuristic(grandfather,next)
                     if not next.visited:
                         heapq.heappush(unvisited_queue, (hscore, next))
                         count_open = count_open + 1
                         opened.append(next.get_coordinates())
-            elif new_dist < next.get_distance():
+            elif new_dist + visibility_weight * new_risk < next.get_distance() + visibility_weight * next.get_risk():
                 next.set_previous(current)
                 next.set_distance(new_dist)
                 next.set_risk(new_risk)
 
-                hscore = next.get_distance() + heuristic(next, goal)
+                hscore = visibility_weight * new_risk + next.get_distance() + heuristic(next, goal)
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -1500,6 +1504,8 @@ def main():
     data_io_opened3 = io.StringIO()
     data_io_visited4 = io.StringIO()
     data_io_opened4 = io.StringIO()
+    data_io_visited5 = io.StringIO()
+    data_io_opened5 = io.StringIO()
 
     data_io_time_cost_dnn1 = io.StringIO()
     data_io_visited_cost_dnn1 = io.StringIO()
@@ -1509,11 +1515,12 @@ def main():
     data_io_comp2 = io.StringIO()
     data_io_comp3 = io.StringIO()
     data_io_comp4 = io.StringIO()
+    data_io_comp5 = io.StringIO()
     data_io_all = io.StringIO()
 
     # cabecalho dos arquivos csv, separador utilizado é o ';'
-    data_io_time_cost_r3.write("""y;x\n""")
-    data_io_visited_cost_r3.write("""y;x\n""")
+    #data_io_time_cost_r3.write("""y;x\n""")
+    #data_io_visited_cost_r3.write("""y;x\n""")
 
     #data_io_visited.write("""y;x\n""")
     #data_io_opened.write("""y;x\n""")
@@ -1526,6 +1533,7 @@ def main():
     data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
     data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
     data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+    data_io_comp5.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
     #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
     if not os.path.exists("./DADOS_RESULTADOS/"):
@@ -1605,6 +1613,7 @@ def main():
 
             #4 casos:
             #1) A* simples, heurística r3
+            b=0
             heuristic = r3_heuristic
             t1 = time()
             opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
@@ -1621,10 +1630,11 @@ def main():
             print("terminou A*\n")
 
             #2)A* adaptado, heuristica r3 e caculo de Angulos
+            b=0.5
             heuristic = r3_heuristic
             
             t2 = time()
-            opened2, count_visited2, count_open2, visited2, cost2 = astarmod(g, source, dest, b, heuristic)
+            opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic)
             t2 = time() - t2
             print("custo do A* topografico: ",cost2)
             print("nodos visitados: ",count_visited2)
@@ -1638,6 +1648,7 @@ def main():
             g.reset()
 
             #3)Theta* adaptado, heuristica r3 e calculo de angulo
+            '''b=0
             heuristic = r3_heuristic
             
             t3 = time()
@@ -1653,11 +1664,11 @@ def main():
             path3 = [dest.get_id()]
             count_visible3 = count_visible_nodes(dest, path3, 0)
             path_len3 = len(path3)
-            g.reset()
+            g.reset()'''
             
             
-            data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
-            data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
+            #data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
+            #data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
             
             #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
             heuristic = dict_dnn_heuristic1
@@ -1677,8 +1688,32 @@ def main():
             
             g.reset()
 
-            data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
-            data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
+            #data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
+            #data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
+            
+            
+            #5)Theta* adaptado, heuristica r3 e calculo de angulo com calculo de segurança
+            '''b=0.5
+            heuristic = r3_heuristic
+            
+            t5 = time()
+            opened5, count_visited5, count_open5, visited5, cost5 = theta_rapido(g, source, dest, b, heuristic)
+            #return visited, len(path), count_open, path, distance
+            t5 = time() - t5
+            print("custo do theta: ",cost5)
+            print("nodos visitados: ",count_visited5)
+            print("nodos abertos: ",count_open5)
+            print("tempo de duração: ", t5)
+            print("Terminou theta\n")
+            
+            path5 = [dest.get_id()]
+            count_visible5 = count_visible_nodes(dest, path5, 0)
+            path_len5 = len(path5)
+            g.reset()'''
+            
+            
+            #data_io_time_cost_r5.write("""%s;%s\n""" % (t2, cost2))
+            #data_io_visited_cost_r5.write("""%s;%s\n""" % (count_visited2, cost2))
             '''
             #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
             heuristic = dict_dnn_heuristic2
@@ -1696,8 +1731,9 @@ def main():
 
             data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
             data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
-            data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+            #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
             data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
+            #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
             
 
             if teste:
@@ -1719,13 +1755,13 @@ def main():
                 write_dataset_test_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
                 write_dataset_test_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
                 
-                for i in range(len(opened3)):
+                '''for i in range(len(opened3)):
                     data_io_opened3.write("""%s\n"""%str((opened3[i])))
                 for i in range(len(visited3)):
                     data_io_visited3.write("""%s\n"""%str((visited3[i])))
 
                 write_dataset_test_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
-                write_dataset_test_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)
+                write_dataset_test_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)'''
                 
                 for i in range(len(opened4)):
                     data_io_opened4.write("""%s\n"""%str((opened4[i])))
