@@ -769,26 +769,32 @@ def generate_dataset_with_vpconfigs():
     g = Graph(mde)
 
     print('Gerando os pontos de amostra')
-    sampling_rate = GenerateVars.sampling_rate
-    sample_coords = generate_sample_points(sampling_rate/100,rows=200,collumns=200) # Gera os pontos de amostra
+    sampling_rate = 1#GenerateVars.sampling_rate
+    sample_coords = generate_sample_points(sampling_rate/100,rows=400,collumns=400) # Gera os pontos de amostra
 
     print('Gerando os viewsheds')
     # Coordenadas de cada observador
     #viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
     #viewpoints = GenerateVars.viewpoints
-    vpconfigs = GenerateVars.vpconfigs
+    vpconfigs = GenerateVars.random_vpconfigs(10,20,20)
+    #vpconfigs = GenerateVars.vpconfigs
     # Raio de visão dos observadores
     view_radius = 40
     # Altura do observador (metros) em relação ao chão
     viewpoint_height = 5
 
-    print('Salvando os viewsheds')
+
+    
     if not os.path.exists("./VIEWSHEDS/"):
         os.makedirs("./VIEWSHEDS/")
     files = glob.glob('./VIEWSHEDS/*')
-    for f in files:
-        os.remove(f)
-    save_viewsheds_vpconfigs(mde.grid, vpconfigs, view_radius, viewpoint_height)
+    if(len(files) > 0):
+        print("Utilizando os viewshed já existentes.")
+    else:
+        print('Salvando os viewsheds.')
+        for f in files:
+            os.remove(f)
+        save_viewsheds_vpconfigs(mde.grid, vpconfigs, view_radius, viewpoint_height)
 
     # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
     V, E, W = generate_sssp_arrays(g)
@@ -813,12 +819,12 @@ def generate_dataset_with_vpconfigs():
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
             for dest_coords in sample_coords[aux+1:]:
                 dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
                 #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
                 #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
             aux = aux +1
 
-            write_dataset_csv('dataset_'+str(vpconfig)+'_'+str(sampling_rate)+'.csv', data_io)
+            write_dataset_csv('./dataset_com_observador_mapa_/dataset_'+str(vpconfig)+'_'+str(sampling_rate)+'.csv', data_io)
         print('Tempo: ' + str(process_time() - start_time) + ' segundos')
 
     print('Dataset gerado com sucesso!')

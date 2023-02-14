@@ -1,4 +1,6 @@
 import io
+import math
+import random
 
 # ----- ----- Teste (Classe auxiliar)----- ----- #
 class TestCase:
@@ -60,22 +62,50 @@ class GenerateVars:
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"
-    vps_map = MapCase(1, "\\recorte400x400.tif", 25)
+    vps_map = MapCase(1, "\\recorte400x400_3.tif", 25)
     
     #Configuração para geração com vpconfigs
     viewpoints = [
-        VPCase(1, 399, 300),
-        VPCase(2, 10, 10),
-        VPCase(4, 200, 200),
-        VPCase(8, 100, 100),
-        VPCase(16, 300, 100),
-        VPCase(32, 6, 6),
-        VPCase(64, 7, 7),
-        VPCase(128, 8, 8),
-        VPCase(256, 9, 9),
-        VPCase(512, 10, 10)
+        VPCase(1, 47, 180),
+        VPCase(2, 121, 149),
+        VPCase(4, 191, 215),
+        VPCase(8, 232, 169),
+        VPCase(16, 241, 56),
+        VPCase(32, 350, 109),
+        VPCase(64, 338, 205), #234, 399
+        VPCase(128, 269, 317),
+        VPCase(256, 356, 346),
+        VPCase(512, 115, 255),
+        VPCase(1024, 73, 349),
+        VPCase(2048, 172, 323),
+        VPCase(4096, 143, 52),
+        VPCase(8192, 50, 50)
     ]
-    vpconfigs = [31, 10, 12] #codigo de id
+    vpconfigs = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16383] #codigo de id
+    
+    def random_vpconfigs(count_one, count_three, count_five):
+        configs = []
+        vps = GenerateVars.viewpoints.copy()
+        
+        for i in range(0, count_one):
+            configs.append(vps.pop(random.randint(0, len(vps)-1)).id_vp)
+            
+        
+        for i in range(0, count_three):
+            vps = GenerateVars.viewpoints.copy()
+            temp = 0
+            for j in range(0, 3):
+                temp = temp + vps.pop(random.randint(0, len(vps)-1)).id_vp
+            configs.append(temp)
+            
+        for i in range(0, count_five):
+            vps = GenerateVars.viewpoints.copy()
+            temp = 0
+            for j in range(0, 5):
+                temp = temp + vps.pop(random.randint(0, len(vps)-1)).id_vp
+            configs.append(temp)
+        return configs
+        
 
     #Configuração para geração com múltiplos mapas (sem viewpoints) 
     maps_dir = ".\\maps\\novps\\"

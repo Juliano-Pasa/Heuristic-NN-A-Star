@@ -113,7 +113,7 @@ def draw_surface(file, projection, alt_diff, size):
     # ALTURA DAS COORDENADAS <- MDE (COLORAÇÃO DO PNG DO FILE)
     z = img[:, :, :-1] * alt_diff
 
-    visited = open_csv('../DADOS_RESULTADOS/opened3.csv')
+    visited = open_csv('../DADOS_RESULTADOS/opened.csv')
     viewshed = mpimg.imread(projection)
 
     # ------------------------ PLOT SUPERFICIE --------------------------- #
@@ -131,7 +131,7 @@ def draw_surface(file, projection, alt_diff, size):
     ls = LightSource(azdeg=0, altdeg=65)
     rgb = ls.shade(np.array(img[:,:,0]).reshape((size,size)), cmap=newcmp)
 
-    # rgb = aplica_viewshed_rgb(rgb, viewshed)  # Descomentar para ilustrar a visibilidade do observador
+    rgb = aplica_viewshed_rgb(rgb, viewshed)  # Descomentar para ilustrar a visibilidade do observador
     rgb = aplica_visited_rgb(rgb, visited)      # Descomentar para projetar os nodos abertos
 
     # Desenha a superfície com as colorações configuradas
@@ -141,7 +141,7 @@ def draw_surface(file, projection, alt_diff, size):
 
 
     # ----------------------------------------- OBSERVADOR(ES) ---------------------------------------------------- #
-    '''viewpoints = [(115, 126)]
+    viewpoints = [(187, 225)]
     # viewpoints = []
     i = 0
     for vp_y, vp_x in viewpoints:
@@ -149,13 +149,13 @@ def draw_surface(file, projection, alt_diff, size):
         mk = '$' + str(i) + '$'
         mk = '$O$'
         ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker='o', color='w', zorder=4.55, s=250)
-        ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker=mk, color='r', zorder=4.6, s=150)'''
+        ax.scatter(vp_y, vp_x, z[vp_y, vp_x, 0], marker=mk, color='r', zorder=4.6, s=150)
 
     # ----------------------------------------------------------------------------------------------------------- #
 
     # ---------------------------------------- CAMINHO ---------------------------------------------------------- #
     # marca as coordenadas percorridas
-    path = open_csv('../DADOS_RESULTADOS/visited3.csv')
+    path = open_csv('../DADOS_RESULTADOS/visited.csv')
     # path = []
     # Pontos do caminho
     for i, cell in enumerate(path):
@@ -218,7 +218,7 @@ def main():
 
     filename = args[1]
     tamanho = args[2]
-    viewshed = '../VIEWSHEDS/VIEWSHED_97_7.png'
+    viewshed = '../VIEWSHEDS/VIEWSHED_CONFIG_1.png'
 
     #Dimensão em pixels da area do nodo = reduction_factor X reduction_factor
     reduction_factor = 1
