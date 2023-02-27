@@ -24,9 +24,9 @@ def shuffle_many(files, file_out='out'):
     files_out = []
     
     #Descobrindo tamanho do mapa
-    #map = pd.read_csv(files[0])
-    #file_lines_number = len(map)
-    file_lines_number = 40423535 #ALTERAR
+    map = pd.read_csv(files[0])
+    file_lines_number = len(map)
+    #file_lines_number = 40423535 #ALTERAR
 
     NUM_OF_FILES = 200 # Quantidade de fragmentos do arquivo .csv original
 
