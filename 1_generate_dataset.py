@@ -398,29 +398,6 @@ def read_viewshed(file):
 # Funções para o cálculo dos mapas de custo paralelizados em GPU
 # Baseados no algoritmo descrito em: Pawan Harish and P. J. Narayanan (2007), Accelerating large graph algorithms on the GPU using CUDA
 
-@cuda.jit
-def kernel2(M, C, U, n):
-    tid = cuda.grid(1)
-    if tid < n:
-        if C[tid] > U[tid]:
-            C[tid] = U[tid]
-            M[tid] = 1
-        U[tid] = C[tid]
-
-
-@cuda.jit
-def kernel1(V, E, W, S, M, C, U, n, b):
-    tid = cuda.grid(1)
-    if tid < n:
-        if M[tid] == 1:
-            M[tid] = 0
-            start = V[tid]
-            if tid == n-1:
-                end = len(E)
-            else:
-                end = V[tid+1]
-            for nid, w in zip(E[start:end], W[start:end]):
-                cuda.atomic.min(U, nid, C[tid] + w + b * S[nid])
 
 @cuda.jit
 def kernel1_without_S(V, E, W, M, C, U, n, b):
@@ -464,9 +441,35 @@ def initialize_arrays_without_S(source, n, INF, M, C, U, b):
 def sum_reduce(a, b):
     return a + b
 
+@cuda.jit
+def kernel2(M, C, U, n):
+    tid = cuda.grid(1)
+    if tid < n:
+        if C[tid] > U[tid]:
+            C[tid] = U[tid]
+            M[tid] = 1
+        U[tid] = C[tid]
+
+
+@cuda.jit
+def kernel1(V, E, W, S, M, C, U, n, b):
+    tid = cuda.grid(1)
+    if tid < n:
+        if M[tid] == 1:
+            M[tid] = 0
+            start = V[tid]
+            if tid == n-1:
+                end = len(E)
+            else:
+                end = V[tid+1]
+            for nid, w in zip(E[start:end], W[start:end]):
+                cuda.atomic.min(U, nid, C[tid] + w + b * S[nid])
 
 def cuda_safe_sssp(V, E, W, S, source, b):
+    # V = lista de vertex, E = lista de edges, W = lista de pesos, S = lista de visibilidade do viewshed
     n = V.shape[0]
+    print(V.shape[0])
+    exit()
     INF = 999999
     threadsperblock = 128
     blockspergrid = (n + (threadsperblock - 1)) // threadsperblock
@@ -518,9 +521,9 @@ def cuda_safe_sssp_without_S(V, E, W, source, b):
 
 # Cria listas de adjacências das conexões do grafo
 def generate_sssp_arrays(g):
-    V = []
-    E = []
-    W = []
+    V = [] #lista de vertex
+    E = [] #lista de edges
+    W = [] #lista de pesos
     for i in range(GRID_ROWS):
         for j in range(GRID_COLS):
             v_id = get_id_by_coords(i, j)
@@ -529,7 +532,9 @@ def generate_sssp_arrays(g):
             V.append(edges_index)
             for u_id in v.get_neighbors():
                 E.append(u_id)
+                print("\n\n\n\n aaaaaaaaaaaaa socorro", v.edges[u_id])
                 W.append(v.edges[u_id])
+           # exit()  
 
     return np.array(V), np.array(E), np.array(W)
 
@@ -652,6 +657,7 @@ def generate_dataset():
         viewshed = read_viewshed(visibility_map_file)
         viewshed = g.normalize_visibility(viewshed)
         S = serialize_viewshed(viewshed)
+        # S = lista de visibilidade do viewshed
         aux = 0
         #print("aaaaaaaaaaaaaaaaaaaaaaaaaa")
         for src_coords in sample_coords:
@@ -726,6 +732,7 @@ def generate_dataset_with_viewpoints():
 
     # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
     V, E, W = generate_sssp_arrays(g)
+    # V = lista de vertex, E = lista de edges, W = lista de pesos
 
     print('Gerando o dataset')
     # Realiza o mesmo processo para cada observador
