@@ -56,13 +56,14 @@ class VPCase:
 class GenerateVars:   
 
     #Configurações gerais 
-    use_viewpoints = True  #Não adaptado para suportar múltiplos mapas.
+    use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
     sampling_rate = 10      # % da Amostragem
     pixel_resolution = 30   #adaptar o código de geração para usar somente o dos mapas
+    type_dataset = 2 #Configuração de dataset (custo verdadeiro = 1,taxa de erro = 2)
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"
-    vps_map = MapCase(1, "\\recorte400x400_3.tif", 25)
+    vps_map = MapCase(1, "\\recorte400x400_3.tif", 30)
     
     #Configuração para geração com vpconfigs
     viewpoints = [
@@ -81,8 +82,24 @@ class GenerateVars:
         VPCase(4096, 143, 52),
         VPCase(8192, 50, 50)
     ]
-    vpconfigs = [1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16383] #codigo de id
+    vpconfigs = [22,28,32,52,64,81,104,112,128,179,194,256,386,400,517,772,1024,1036,1281,1344,1552,2048,2568,2581,2641,3680,4096,4164,4228,4249,4293,4396,4433,4646,4756,5444,5672,6272,7236,8192,8245,8260,8376,8467,8474,9864,11332,11584] #codigo de id
     
+        
+    #Configuração para geração com múltiplos mapas (sem viewpoints) 
+    maps_dir = ".\\maps\\novps\\"
+    maps = [
+        MapCase(1, "\\recorte300x300A.tif", 30),
+        MapCase(2, "\\recorte300x300B.tif", 30),
+        MapCase(3, "\\recorte300x300C.tif", 30),
+        MapCase(4, "\\recorte300x300D.tif", 30),
+        MapCase(5, "\\recorte300x300E.tif", 30),
+        MapCase(6, "\\recorte300x300F.tif", 30),
+        MapCase(7, "\\recorte300x300G.tif", 30),
+        MapCase(8, "\\recorte300x300H.tif", 30)
+    ]    
+    files_dir = ".\\dataset_sem_observador_mapa_\\"
+    
+    #Funções
     def random_vpconfigs(count_one, count_three, count_five):
         configs = []
         vps = GenerateVars.viewpoints.copy()
@@ -105,18 +122,3 @@ class GenerateVars:
                 temp = temp + vps.pop(random.randint(0, len(vps)-1)).id_vp
             configs.append(temp)
         return configs
-        
-
-    #Configuração para geração com múltiplos mapas (sem viewpoints) 
-    maps_dir = ".\\maps\\novps\\"
-    maps = [
-        #MapCase(1, "\\recorte300x300A.tif", 30),
-        MapCase(2, "\\recorte300x300B.tif", 30)
-        #MapCase(3, "\\recorte300x300C.tif", 30),
-        #MapCase(4, "\\recorte300x300D.tif", 30),
-        #MapCase(5, "\\recorte300x300E.tif", 30),
-        #MapCase(6, "\\recorte300x300F.tif", 30),
-        #MapCase(7, "\\recorte300x300G.tif", 30),
-       # MapCase(8, "\\recorte300x300H.tif", 30)
-    ]    
-    files_dir = ".\\dataset_sem_observador_mapa_\\"

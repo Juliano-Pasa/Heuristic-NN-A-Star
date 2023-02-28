@@ -661,17 +661,29 @@ def generate_dataset():
             C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
             
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-            for dest_coords in sample_coords[aux+1:]:
-                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
-                str(int(src_coords[1] * CELL_WIDTH)), 
-                str(int(src_coords[0] * CELL_HEIGHT)),
-                str(mde.grid[src_coords[0], src_coords[1]]), 
-                str(int(dest_coords[1] * CELL_WIDTH)),
-                str(int(dest_coords[0] * CELL_HEIGHT)), 
-                mde.grid[dest_coords[0], dest_coords[1]], 
-                C[dest]))
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+            if(GenerateVars.type_dataset == 1):
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
+                    str(int(src_coords[1] * CELL_WIDTH)), 
+                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(mde.grid[src_coords[0], src_coords[1]]), 
+                    str(int(dest_coords[1] * CELL_WIDTH)),
+                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    mde.grid[dest_coords[0], dest_coords[1]], 
+                    C[dest]))
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+            elif(GenerateVars.type_dataset == 2):
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
+                    str(int(src_coords[1] * CELL_WIDTH)), 
+                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(mde.grid[src_coords[0], src_coords[1]]), 
+                    str(int(dest_coords[1] * CELL_WIDTH)),
+                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    mde.grid[dest_coords[0], dest_coords[1]], 
+                    C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
                 
             aux = aux +1
 
@@ -769,7 +781,7 @@ def generate_dataset_with_vpconfigs():
     g = Graph(mde)
 
     print('Gerando os pontos de amostra')
-    sampling_rate = 1#GenerateVars.sampling_rate
+    sampling_rate = 10#GenerateVars.sampling_rate
     sample_coords = generate_sample_points(sampling_rate/100,rows=400,collumns=400) # Gera os pontos de amostra
 
     print('Gerando os viewsheds')
