@@ -468,8 +468,6 @@ def kernel1(V, E, W, S, M, C, U, n, b):
 def cuda_safe_sssp(V, E, W, S, source, b):
     # V = lista de vertex, E = lista de edges, W = lista de pesos, S = lista de visibilidade do viewshed
     n = V.shape[0]
-    print(V.shape[0])
-    exit()
     INF = 999999
     threadsperblock = 128
     blockspergrid = (n + (threadsperblock - 1)) // threadsperblock
