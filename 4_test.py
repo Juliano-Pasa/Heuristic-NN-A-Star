@@ -980,6 +980,61 @@ def safe_astar(g, start, goal, v_weight, heuristic):
                     count_open = count_open + 1
                     opened.append(next.get_coordinates())
 
+def astar_correction_factor(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + r3_heuristic(start, goal)*heuristic(start,goal)
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    opened.append(start.get_coordinates())
+
+    while len(unvisited_queue):
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+        if current == goal:
+            #print("ÇOCORRO DEUS\n\n\n\n\n",visited)
+            #break
+            distance = current.get_distance()
+            path=[]
+            path=backtracking(current,start)
+            
+            #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
+            return visited, len(path), count_open, path, distance
+
+        current.set_visited(True)
+        count_visited = count_visited + 1
+        visited.append(current.get_coordinates())
+
+        for next_id in current.get_neighbors():
+            next = g.get_vertex(next_id)
+            new_dist = current.get_distance() + current.get_edge_weight(next_id)
+            new_risk = current.get_risk() + next.get_local_risk()
+
+            if new_dist < next.get_distance():
+                next.set_previous(current)
+                next.set_distance(new_dist)
+                next.set_risk(new_risk)
+                #print("retorno do fator de correção",heuristic(next,goal))
+                hscore = new_dist + r3_heuristic(next, goal)*heuristic(next,goal)
+
+                if not next.visited:
+                    heapq.heappush(unvisited_queue, (hscore, next))
+                    count_open = count_open + 1
+                    opened.append(next.get_coordinates())
+
 # A*
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -1351,6 +1406,34 @@ def generate_sample_points(sampling_percentage):
 
 
 # Mapa heurístico da DNN com 6 entradas
+def heuristic_dict1_multiplos_mapas(g, model, goal):
+    todos_vertices = g.get_vertices()
+
+    dataset = []
+    t1_start = time()
+    for vertice_x in g:
+        vertice_y = goal
+
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([1, x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([1, x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    with tf.device('/gpu:0'):
+        predicoes = model.predict_on_batch(dataset)
+
+    dict_heuristica = dict(zip(todos_vertices, predicoes))
+
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
 def heuristic_dict1(g, model, goal):
     todos_vertices = g.get_vertices()
 
@@ -1364,9 +1447,9 @@ def heuristic_dict1(g, model, goal):
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([x2, y2, alt2, x1, y1, alt1])
+            dataset.append([ x2, y2, alt2, x1, y1, alt1])
         else:
-            dataset.append([x1, y1, alt1, x2, y2, alt2])
+            dataset.append([ x1, y1, alt1, x2, y2, alt2])
 
     # Monta um dicionário com as predições da DNN
     dataset = np.array(dataset)
@@ -1465,8 +1548,9 @@ def count_visible_nodes(v, path, count_visible):
 def main():
     args = sys.argv
     filename = args[1] # recorte .tif do terreno
-    model_name1 = 'model_1_10.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
-    #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+    '''model_1_10.hdf5''' 
+    model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+    model_name2 = 'model_1_10.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
@@ -1485,7 +1569,7 @@ def main():
     # Carrega os modelos das redes neurais treinadas
     #model1 = load_model(model_name1)
     model1 = load_model(model_name1)
-
+    model2 = load_model(model_name2)
     print('Iniciando')
 
     # Quantidade de caminhos para cada observador (100 X 1000)
@@ -1608,8 +1692,8 @@ def main():
             print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
             #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
             
-            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
-            #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model1,observer, dest)
+            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
+            dnn_heuristic_dict2, h_map_time2 = heuristic_dict1(g, model2, dest)
 
             #4 casos:
             #1) A* simples, heurística r3
@@ -1629,14 +1713,14 @@ def main():
 
             print("terminou A*\n")
 
-            #2)A* adaptado, heuristica r3 e caculo de Angulos
-            b=0.5
-            heuristic = r3_heuristic
+            #2)A* adaptado, heuristica r3 e caminhos seguros
+            b=0
+            heuristic = dict_dnn_heuristic2
             
             t2 = time()
             opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic)
             t2 = time() - t2
-            print("custo do A* topografico: ",cost2)
+            print("custo do A* topografico dnn custo: ",cost2)
             print("nodos visitados: ",count_visited2)
             print("nodos abertos: ",count_open2)
             
@@ -1673,13 +1757,13 @@ def main():
             #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
             heuristic = dict_dnn_heuristic1
             t4 = time()
-            opened4, count_visited4, count_open4, visited4, cost4 = astar(g, source, dest, b, heuristic)
+            opened4, count_visited4, count_open4, visited4, cost4 = astar_correction_factor(g, source, dest, b, heuristic)
             t4 = time() - t4
             path4 = [dest.get_id()]
             #count_visible4 = count_visible_nodes(dest, path4, 0)
             path_len4 = len(path4)
             
-            print("custo do a* com dnn: ",cost4)
+            print("custo do a* com dnn fator de correção: ",cost4)
             print("nodos visitados: ",count_visited4)
             print("nodos abertos: ",count_open4)
             print("tempo de duração: ", t4)
@@ -1730,7 +1814,7 @@ def main():
             #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
 
             data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
-            data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
+           # data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
             #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
             data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
             #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
@@ -1747,10 +1831,10 @@ def main():
                 write_dataset_test_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
                 write_dataset_test_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
                 
-                for i in range(len(opened2)):
+                '''for i in range(len(opened2)):
                     data_io_opened2.write("""%s\n"""%str((opened2[i])))
                 for i in range(len(visited2)):
-                    data_io_visited2.write("""%s\n"""%str((visited2[i])))
+                    data_io_visited2.write("""%s\n"""%str((visited2[i])))'''
 
                 write_dataset_test_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
                 write_dataset_test_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
