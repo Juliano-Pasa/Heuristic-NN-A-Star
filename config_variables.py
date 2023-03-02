@@ -59,7 +59,7 @@ class GenerateVars:
     use_viewpoints = False  #Não adaptado para suportar múltiplos mapas.
     sampling_rate = 10      # % da Amostragem
     pixel_resolution = 30   #adaptar o código de geração para usar somente o dos mapas
-    type_dataset = 2 #Configuração de dataset (custo verdadeiro = 1,taxa de erro = 2)
+    type_dataset = 3 #Configuração de dataset (custo verdadeiro = 1,taxa de erro = 2, custo r3 dataset do theta = 3)
 
     #Configuração para geração com viewpoints 
     vps_map_dir = ".\\maps\\vps\\"

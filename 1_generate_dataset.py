@@ -684,6 +684,17 @@ def generate_dataset():
                     str(int(dest_coords[0] * CELL_HEIGHT)), 
                     mde.grid[dest_coords[0], dest_coords[1]], 
                     C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
+            elif(GenerateVars.type_dataset == 3):
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
+                    str(int(src_coords[1] * CELL_WIDTH)), 
+                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(mde.grid[src_coords[0], src_coords[1]]), 
+                    str(int(dest_coords[1] * CELL_WIDTH)),
+                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    mde.grid[dest_coords[0], dest_coords[1]], 
+                    r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
                 
             aux = aux +1
 
