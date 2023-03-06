@@ -31,7 +31,7 @@ class TestVars:
     reduction_factor = 1
     use_dnn = True
     use_observer = True
-    test = True
+    test = False
 
 # Casos de Teste
     test_cases = [TestCase("Astar", "astar", "astar", "r3_heuristic"),
