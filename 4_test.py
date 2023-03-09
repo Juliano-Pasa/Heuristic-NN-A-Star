@@ -8,7 +8,8 @@ import csv
 import heapq
 import os
 import glob
-from config_variables import TestVars, TestCase 
+from config_variables import TestVars, TestCase, GenerateVars
+
 import matplotlib.image as mpimg
 from time import time
 from time import process_time
@@ -980,6 +981,61 @@ def safe_astar(g, start, goal, v_weight, heuristic):
                     count_open = count_open + 1
                     opened.append(next.get_coordinates())
 
+def astar_correction_factor(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + r3_heuristic(start, goal)*heuristic(start,goal)
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    opened.append(start.get_coordinates())
+
+    while len(unvisited_queue):
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+        if current == goal:
+            #print("ÇOCORRO DEUS\n\n\n\n\n",visited)
+            #break
+            distance = current.get_distance()
+            path=[]
+            path=backtracking(current,start)
+            
+            #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
+            return visited, len(path), count_open, path, distance
+
+        current.set_visited(True)
+        count_visited = count_visited + 1
+        visited.append(current.get_coordinates())
+
+        for next_id in current.get_neighbors():
+            next = g.get_vertex(next_id)
+            new_dist = current.get_distance() + current.get_edge_weight(next_id)
+            new_risk = current.get_risk() + next.get_local_risk()
+
+            if new_dist < next.get_distance():
+                next.set_previous(current)
+                next.set_distance(new_dist)
+                next.set_risk(new_risk)
+                #print("retorno do fator de correção",heuristic(next,goal))
+                hscore = new_dist + r3_heuristic(next, goal)*heuristic(next,goal)
+
+                if not next.visited:
+                    heapq.heappush(unvisited_queue, (hscore, next))
+                    count_open = count_open + 1
+                    opened.append(next.get_coordinates())
+
 # A*
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -1351,6 +1407,34 @@ def generate_sample_points(sampling_percentage):
 
 
 # Mapa heurístico da DNN com 6 entradas
+def heuristic_dict1_multiplos_mapas(g, model, goal):
+    todos_vertices = g.get_vertices()
+
+    dataset = []
+    t1_start = time()
+    for vertice_x in g:
+        vertice_y = goal
+
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([1, x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([1, x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    with tf.device('/gpu:0'):
+        predicoes = model.predict_on_batch(dataset)
+
+    dict_heuristica = dict(zip(todos_vertices, predicoes))
+
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
 def heuristic_dict1(g, model, goal):
     todos_vertices = g.get_vertices()
 
@@ -1364,9 +1448,9 @@ def heuristic_dict1(g, model, goal):
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([x2, y2, alt2, x1, y1, alt1])
+            dataset.append([ x2, y2, alt2, x1, y1, alt1])
         else:
-            dataset.append([x1, y1, alt1, x2, y2, alt2])
+            dataset.append([ x1, y1, alt1, x2, y2, alt2])
 
     # Monta um dicionário com as predições da DNN
     dataset = np.array(dataset)
@@ -1464,101 +1548,54 @@ def count_visible_nodes(v, path, count_visible):
 
 def main():
     args = sys.argv
-    filename = args[1] # recorte .tif do terreno
-    model_name1 = 'model_1_10.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
-    #model_name2 = args[3] # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+    #filename = args[1] # recorte .tif do terreno
+    '''model_1_10.hdf5''' 
+    model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+    model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
     # Lê o arquivo do MDE e cria o grid do mapa
-    mde = Mde(filename, reduction_factor)
 
-    print('Criando o grafo')
     # Cria o grafo a partir do grid do MDE
-    g = Graph(mde)
 
-    print('Gerando os viewsheds')
     # Coordenadas de cada observador
     # Gera as mesma coordenadas utilizadas na criação do dataset de treinamento
-    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
 
     # Carrega os modelos das redes neurais treinadas
     #model1 = load_model(model_name1)
     model1 = load_model(model_name1)
-
+    model2 = load_model(model_name2)
     print('Iniciando')
 
+    for mp in GenerateVars.maps:
+        map_path = GenerateVars.maps_dir + mp.filename
+        print('Criando o grafo')
+        mde = Mde(map_path, mp.reduction_factor)
+        print(mp.filename)
+        print(mp.id_map)
+        g = Graph(mde)
+        viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
+        print('Gerando os viewsheds')
     # Quantidade de caminhos para cada observador (100 X 1000)
-    paths_per_map = 1000
+        paths_per_map = 100000
 
-    start_time = time()
-
-    data_io_time_cost_r3 = io.StringIO()
-    data_io_visited_cost_r3 = io.StringIO()
-
-    data_io_visited = io.StringIO()
-    data_io_opened = io.StringIO()
-    data_io_visited2 = io.StringIO()
-    data_io_opened2 = io.StringIO()
-    data_io_visited3 = io.StringIO()
-    data_io_opened3 = io.StringIO()
-    data_io_visited4 = io.StringIO()
-    data_io_opened4 = io.StringIO()
-    data_io_visited5 = io.StringIO()
-    data_io_opened5 = io.StringIO()
-
-    data_io_time_cost_dnn1 = io.StringIO()
-    data_io_visited_cost_dnn1 = io.StringIO()
-    data_io_time_cost_dnn2 = io.StringIO()
-    data_io_visited_cost_dnn2 = io.StringIO()
-    data_io_comp = io.StringIO()
-    data_io_comp2 = io.StringIO()
-    data_io_comp3 = io.StringIO()
-    data_io_comp4 = io.StringIO()
-    data_io_comp5 = io.StringIO()
-    data_io_all = io.StringIO()
-
-    # cabecalho dos arquivos csv, separador utilizado é o ';'
-    #data_io_time_cost_r3.write("""y;x\n""")
-    #data_io_visited_cost_r3.write("""y;x\n""")
-
-    #data_io_visited.write("""y;x\n""")
-    #data_io_opened.write("""y;x\n""")
-
-    #data_io_time_cost_dnn1.write("""y;x\n""")
-   # data_io_visited_cost_dnn1.write("""y;x\n""")
-    #data_io_time_cost_dnn2.write("""y;x\n""")
-    #data_io_visited_cost_dnn2.write("""y;x\n""")
-    data_io_comp.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-    data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-    data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-    data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-    data_io_comp5.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-    #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
-
-    if not os.path.exists("./DADOS_RESULTADOS/"):
-        os.makedirs("./DADOS_RESULTADOS/")
-
-    #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
-   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
-    #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
-   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
-   # write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
-   # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
-    write_dataset_csv('./DADOS_RESULTADOS/A_star.csv', data_io_comp)
-    write_dataset_csv('./DADOS_RESULTADOS/A_star_mod.csv', data_io_comp2)
-    write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
-    write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
-   # write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
-    #write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
-    teste= TestVars.test
-    # Realiza o mesmo processo para cada observador
-    print(len(viewpoints))
-    for vp in viewpoints:
-        observer = (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]])  # Coordenadas do observador
+        start_time = time()
 
         data_io_time_cost_r3 = io.StringIO()
         data_io_visited_cost_r3 = io.StringIO()
+
+        data_io_visited = io.StringIO()
+        data_io_opened = io.StringIO()
+        data_io_visited2 = io.StringIO()
+        data_io_opened2 = io.StringIO()
+        data_io_visited3 = io.StringIO()
+        data_io_opened3 = io.StringIO()
+        data_io_visited4 = io.StringIO()
+        data_io_opened4 = io.StringIO()
+        data_io_visited5 = io.StringIO()
+        data_io_opened5 = io.StringIO()
+
         data_io_time_cost_dnn1 = io.StringIO()
         data_io_visited_cost_dnn1 = io.StringIO()
         data_io_time_cost_dnn2 = io.StringIO()
@@ -1567,231 +1604,284 @@ def main():
         data_io_comp2 = io.StringIO()
         data_io_comp3 = io.StringIO()
         data_io_comp4 = io.StringIO()
+        data_io_comp5 = io.StringIO()
         data_io_all = io.StringIO()
 
-        b = 0.5  # Fator de importância da segurança no cálculo do custo
-        visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
+        # cabecalho dos arquivos csv, separador utilizado é o ';'
+        #data_io_time_cost_r3.write("""y;x\n""")
+        #data_io_visited_cost_r3.write("""y;x\n""")
 
-        #viewshed = read_viewshed(visibility_map_file)
-        #viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
+        #data_io_visited.write("""y;x\n""")
+        #data_io_opened.write("""y;x\n""")
 
-        # Atribui a cada vértice o nível de visibilidade do viewshed
-        
-        #g.update_vertices_risk(viewshed)
+        #data_io_time_cost_dnn1.write("""y;x\n""")
+    # data_io_visited_cost_dnn1.write("""y;x\n""")
+        #data_io_time_cost_dnn2.write("""y;x\n""")
+        #data_io_visited_cost_dnn2.write("""y;x\n""")
+        data_io_comp.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        data_io_comp5.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
-        # ------------------------------------------------------------ #
-        # Cria as combinações de pares de origem-destino
-        sampling_rate = 0.125
-        sample_coords = generate_sample_points(sampling_rate / 100)
+        if not os.path.exists("./DADOS_RESULTADOS/"):
+            os.makedirs("./DADOS_RESULTADOS/")
 
-        aux = 0
-        combinations = []
-        for coords in sample_coords:
-            for coords2 in sample_coords[aux+1:]:
-                combinations.append([coords, coords2])
-            aux += 1
-
-        random.shuffle(combinations)
-        combinations = combinations[:paths_per_map]
-        # ----------------------------------------------------------- #
-        # Itera nos N pares de origem e destino
-        for pair in combinations:
-            src_coords = (128,192) #pair[0](128,192)
-            dest_coords = (58,92) #pair[1](58,92)
-            source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-            source = g.get_vertex(source_id)
-            #print("aaaa",source)
-            dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
-            dest = g.get_vertex(dest_id)
-            global dnn_heuristic_dict1
-            global dnn_heuristic_dict2
-            print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
-            #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
-            
-            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1(g, model1, dest)
-            #dnn_heuristic_dict2, h_map_time2 = heuristic_dict2(g, model1,observer, dest)
-
-            #4 casos:
-            #1) A* simples, heurística r3
-            b=0
-            heuristic = r3_heuristic
-            t1 = time()
-            opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-            t1 = time() - t1
-            path1 = [dest.get_id()]
-            print("custo do a*: ",cost1)
-            print("nodos visitados: ",count_visited1)
-            print("nodos abertos: ",count_open1)
-            count_visible1 = count_visible_nodes(dest, path1, 0)
-            path_len1 = len(path1)
-            print("tempo de duração: ", t1)
-            g.reset()
-
-            print("terminou A*\n")
-
-            #2)A* adaptado, heuristica r3 e caculo de Angulos
-            b=0.5
-            heuristic = r3_heuristic
-            
-            t2 = time()
-            opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic)
-            t2 = time() - t2
-            print("custo do A* topografico: ",cost2)
-            print("nodos visitados: ",count_visited2)
-            print("nodos abertos: ",count_open2)
-            
-            path2 = [dest.get_id()]
-            count_visible2 = count_visible_nodes(dest, path2, 0)
-            path_len2 = len(path2)
-            print("tempo de duração: ", t2)
-            print("Terminou A* topo\n")
-            g.reset()
-
-            #3)Theta* adaptado, heuristica r3 e calculo de angulo
-            '''b=0
-            heuristic = r3_heuristic
-            
-            t3 = time()
-            opened3, count_visited3, count_open3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
-            #return visited, len(path), count_open, path, distance
-            t3 = time() - t3
-            print("custo do theta: ",cost3)
-            print("nodos visitados: ",count_visited3)
-            print("nodos abertos: ",count_open3)
-            print("tempo de duração: ", t3)
-            print("Terminou theta\n")
-            
-            path3 = [dest.get_id()]
-            count_visible3 = count_visible_nodes(dest, path3, 0)
-            path_len3 = len(path3)
-            g.reset()'''
-            
-            
-            #data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
-            #data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
-            
-            #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
-            heuristic = dict_dnn_heuristic1
-            t4 = time()
-            opened4, count_visited4, count_open4, visited4, cost4 = astar(g, source, dest, b, heuristic)
-            t4 = time() - t4
-            path4 = [dest.get_id()]
-            #count_visible4 = count_visible_nodes(dest, path4, 0)
-            path_len4 = len(path4)
-            
-            print("custo do a* com dnn: ",cost4)
-            print("nodos visitados: ",count_visited4)
-            print("nodos abertos: ",count_open4)
-            print("tempo de duração: ", t4)
-            print("tempo do mapeamente heurístico: ", h_map_time1)
-            print("Terminou A* com dnn\n")
-            
-            g.reset()
-
-            #data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
-            #data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
-            
-            
-            #5)Theta* adaptado, heuristica r3 e calculo de angulo com calculo de segurança
-            '''b=0.5
-            heuristic = r3_heuristic
-            
-            t5 = time()
-            opened5, count_visited5, count_open5, visited5, cost5 = theta_rapido(g, source, dest, b, heuristic)
-            #return visited, len(path), count_open, path, distance
-            t5 = time() - t5
-            print("custo do theta: ",cost5)
-            print("nodos visitados: ",count_visited5)
-            print("nodos abertos: ",count_open5)
-            print("tempo de duração: ", t5)
-            print("Terminou theta\n")
-            
-            path5 = [dest.get_id()]
-            count_visible5 = count_visible_nodes(dest, path5, 0)
-            path_len5 = len(path5)
-            g.reset()'''
-            
-            
-            #data_io_time_cost_r5.write("""%s;%s\n""" % (t2, cost2))
-            #data_io_visited_cost_r5.write("""%s;%s\n""" % (count_visited2, cost2))
-            '''
-            #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
-            heuristic = dict_dnn_heuristic2
-            t4 = time()
-            distance4, safety4, count_visited4, count_open4, opened4, visited4, cost4 = safe_astar(g, source, dest, b,
-                                                                                                   heuristic)
-            path4 = [dest.get_id()]
-            count_visible4 = count_visible_nodes(dest, path4, 0)
-            path_len4 = len(path4)
-            t4 = time() - t4 + h_map_time2
-            g.reset()'''
-
-            #data_io_time_cost_dnn2.write("""%s;%s\n""" % (t4, cost4))
-            #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
-
-            data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
-            data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
-            #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
-            data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
-            #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
-            
-
-            if teste:
-                teste=False
-                print("\n\n\n Quero ver ",opened1[0])
-                for i in range(len(opened1)):
-                    data_io_opened.write("""%s\n"""%str((opened1[i])))
-                for i in range(len(visited1)):
-                    data_io_visited.write("""%s\n"""%str((visited1[i])))
-
-                write_dataset_test_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
-                write_dataset_test_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
-                
-                for i in range(len(opened2)):
-                    data_io_opened2.write("""%s\n"""%str((opened2[i])))
-                for i in range(len(visited2)):
-                    data_io_visited2.write("""%s\n"""%str((visited2[i])))
-
-                write_dataset_test_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
-                write_dataset_test_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
-                
-                '''for i in range(len(opened3)):
-                    data_io_opened3.write("""%s\n"""%str((opened3[i])))
-                for i in range(len(visited3)):
-                    data_io_visited3.write("""%s\n"""%str((visited3[i])))
-
-                write_dataset_test_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
-                write_dataset_test_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)'''
-                
-                for i in range(len(opened4)):
-                    data_io_opened4.write("""%s\n"""%str((opened4[i])))
-                for i in range(len(visited4)):
-                    data_io_visited4.write("""%s\n"""%str((visited4[i])))
-
-                write_dataset_test_csv('./DADOS_RESULTADOS/visited4.csv',data_io_visited4)
-                write_dataset_test_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
-                break
-
-
-            
-
-            #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
-            #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
-        write_dataset_csv('./DADOS_RESULTADOS/A_star.csv', data_io_comp)
-        write_dataset_csv('./DADOS_RESULTADOS/A_star_mod.csv', data_io_comp2)
-        write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
-        write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN.csv', data_io_comp4)
         #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
-       # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
+    # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
         #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
-        #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
-        #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
-        #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
-        #write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
-        #write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+    # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
+    # write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
+    # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_dnn'+str(mp.id_map)+'.csv', data_io_comp2)
+        #write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_dnn_CF'+str(mp.id_map)+'.csv', data_io_comp4)
+    # write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+        #write_dataset_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+        teste= TestVars.test
+        
+        # Realiza o mesmo processo para cada observador
+        print(len(viewpoints))
+        for vp in viewpoints:
+            observer = (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]])  # Coordenadas do observador
 
-        print('Tempo: ' + str(time() - start_time) + ' segundos')
-        break
+            data_io_time_cost_r3 = io.StringIO()
+            data_io_visited_cost_r3 = io.StringIO()
+            data_io_time_cost_dnn1 = io.StringIO()
+            data_io_visited_cost_dnn1 = io.StringIO()
+            data_io_time_cost_dnn2 = io.StringIO()
+            data_io_visited_cost_dnn2 = io.StringIO()
+            data_io_comp = io.StringIO()
+            data_io_comp2 = io.StringIO()
+            data_io_comp3 = io.StringIO()
+            data_io_comp4 = io.StringIO()
+            data_io_all = io.StringIO()
+
+            b = 0.5  # Fator de importância da segurança no cálculo do custo
+            visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
+
+            #viewshed = read_viewshed(visibility_map_file)
+            #viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
+
+            # Atribui a cada vértice o nível de visibilidade do viewshed
+            
+            #g.update_vertices_risk(viewshed)
+
+            # ------------------------------------------------------------ #
+            # Cria as combinações de pares de origem-destino
+            sampling_rate = 0.125
+            sample_coords = generate_sample_points(sampling_rate / 100)
+
+            aux = 0
+            combinations = []
+            for coords in sample_coords:
+                for coords2 in sample_coords[aux+1:]:
+                    combinations.append([coords, coords2])
+                aux += 1
+
+            random.shuffle(combinations)
+            combinations = combinations[:paths_per_map]
+            # ----------------------------------------------------------- #
+            # Itera nos N pares de origem e destino
+            for pair in combinations:
+                src_coords = pair[0] #pair[0](128,192)
+                dest_coords = pair[1] #pair[1](58,92)
+                source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
+                source = g.get_vertex(source_id)
+                #print("aaaa",source)
+                dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
+                dest = g.get_vertex(dest_id)
+                global dnn_heuristic_dict1
+                global dnn_heuristic_dict2
+                #print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
+                #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
+                
+                dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
+                dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+
+                #4 casos:
+                #1) A* simples, heurística r3
+                b=0
+                heuristic = r3_heuristic
+                t1 = time()
+                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t1 = time() - t1
+                path1 = [dest.get_id()]
+                #print("custo do a*: ",cost1)
+                #print("nodos visitados: ",count_visited1)
+                #print("nodos abertos: ",count_open1)
+                count_visible1 = count_visible_nodes(dest, path1, 0)
+                path_len1 = len(path1)
+                #print("tempo de duração: ", t1)
+                g.reset()
+
+                #print("terminou A*\n")
+
+                #2)A* adaptado, heuristica r3 e caminhos seguros
+                b=0
+                heuristic = dict_dnn_heuristic2
+                
+                t2 = time()
+                opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic)
+                t2 = time() - t2
+                #print("custo do A* topografico dnn custo: ",cost2)
+                #print("nodos visitados: ",count_visited2)
+                #print("nodos abertos: ",count_open2)
+                
+                path2 = [dest.get_id()]
+                count_visible2 = count_visible_nodes(dest, path2, 0)
+                path_len2 = len(path2)
+                #print("tempo de duração: ", t2)
+                #print("Terminou A* topo\n")
+                g.reset()
+
+                #3)Theta* adaptado, heuristica r3 e calculo de angulo
+                '''b=0
+                heuristic = r3_heuristic
+                
+                t3 = time()
+                opened3, count_visited3, count_open3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
+                #return visited, len(path), count_open, path, distance
+                t3 = time() - t3
+                print("custo do theta: ",cost3)
+                print("nodos visitados: ",count_visited3)
+                print("nodos abertos: ",count_open3)
+                print("tempo de duração: ", t3)
+                print("Terminou theta\n")
+                
+                path3 = [dest.get_id()]
+                count_visible3 = count_visible_nodes(dest, path3, 0)
+                path_len3 = len(path3)
+                g.reset()'''
+                
+                
+                #data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
+                #data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
+                
+                #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
+                heuristic = dict_dnn_heuristic1
+                t4 = time()
+                opened4, count_visited4, count_open4, visited4, cost4 = astar_correction_factor(g, source, dest, b, heuristic)
+                t4 = time() - t4
+                path4 = [dest.get_id()]
+                #count_visible4 = count_visible_nodes(dest, path4, 0)
+                path_len4 = len(path4)
+                
+                #print("custo do a* com dnn fator de correção: ",cost4)
+                #print("nodos visitados: ",count_visited4)
+                #print("nodos abertos: ",count_open4)
+                #print("tempo de duração: ", t4)
+                #print("tempo do mapeamente heurístico: ", h_map_time1)
+                #print("Terminou A* com dnn\n")
+                
+                g.reset()
+
+                #data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
+                #data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
+                
+                
+                #5)Theta* adaptado, heuristica r3 e calculo de angulo com calculo de segurança
+                '''b=0.5
+                heuristic = r3_heuristic
+                
+                t5 = time()
+                opened5, count_visited5, count_open5, visited5, cost5 = theta_rapido(g, source, dest, b, heuristic)
+                #return visited, len(path), count_open, path, distance
+                t5 = time() - t5
+                print("custo do theta: ",cost5)
+                print("nodos visitados: ",count_visited5)
+                print("nodos abertos: ",count_open5)
+                print("tempo de duração: ", t5)
+                print("Terminou theta\n")
+                
+                path5 = [dest.get_id()]
+                count_visible5 = count_visible_nodes(dest, path5, 0)
+                path_len5 = len(path5)
+                g.reset()'''
+                
+                
+                #data_io_time_cost_r5.write("""%s;%s\n""" % (t2, cost2))
+                #data_io_visited_cost_r5.write("""%s;%s\n""" % (count_visited2, cost2))
+                '''
+                #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
+                heuristic = dict_dnn_heuristic2
+                t4 = time()
+                distance4, safety4, count_visited4, count_open4, opened4, visited4, cost4 = safe_astar(g, source, dest, b,
+                                                                                                    heuristic)
+                path4 = [dest.get_id()]
+                count_visible4 = count_visible_nodes(dest, path4, 0)
+                path_len4 = len(path4)
+                t4 = time() - t4 + h_map_time2
+                g.reset()'''
+
+                #data_io_time_cost_dnn2.write("""%s;%s\n""" % (t4, cost4))
+                #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
+
+                data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
+                data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
+                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+                data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
+                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
+                
+
+                if teste:
+                    teste=False
+                    #print("\n\n\n Quero ver ",opened1[0])
+                    for i in range(len(opened1)):
+                        data_io_opened.write("""%s\n"""%str((opened1[i])))
+                    for i in range(len(visited1)):
+                        data_io_visited.write("""%s\n"""%str((visited1[i])))
+
+                    write_dataset_test_csv('./DADOS_RESULTADOS/visited.csv',data_io_visited)
+                    write_dataset_test_csv('./DADOS_RESULTADOS/opened.csv',data_io_opened)
+                    
+                    '''for i in range(len(opened2)):
+                        data_io_opened2.write("""%s\n"""%str((opened2[i])))
+                    for i in range(len(visited2)):
+                        data_io_visited2.write("""%s\n"""%str((visited2[i])))'''
+
+                    write_dataset_test_csv('./DADOS_RESULTADOS/visited2.csv',data_io_visited2)
+                    write_dataset_test_csv('./DADOS_RESULTADOS/opened2.csv',data_io_opened2)
+                    
+                    '''for i in range(len(opened3)):
+                        data_io_opened3.write("""%s\n"""%str((opened3[i])))
+                    for i in range(len(visited3)):
+                        data_io_visited3.write("""%s\n"""%str((visited3[i])))
+
+                    write_dataset_test_csv('./DADOS_RESULTADOS/visited3.csv',data_io_visited3)
+                    write_dataset_test_csv('./DADOS_RESULTADOS/opened3.csv',data_io_opened3)'''
+                    
+                    for i in range(len(opened4)):
+                        data_io_opened4.write("""%s\n"""%str((opened4[i])))
+                    for i in range(len(visited4)):
+                        data_io_visited4.write("""%s\n"""%str((visited4[i])))
+
+                    write_dataset_test_csv('./DADOS_RESULTADOS/visited4.csv',data_io_visited4)
+                    write_dataset_test_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
+                    break
+
+
+                
+
+                #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
+                #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
+            write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp)
+            write_dataset_csv('./DADOS_RESULTADOS/A_star_dnn'+str(mp.id_map)+'.csv', data_io_comp2)
+            #write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
+            write_dataset_csv('./DADOS_RESULTADOS/A_star_dnn_CF'+str(mp.id_map)+'.csv', data_io_comp4)
+            #write_dataset_csv('./DADOS_RESULTADOS/time_cost_r3.csv', data_io_time_cost_r3)
+        # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_r3.csv', data_io_visited_cost_r3)
+            #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn1.csv', data_io_time_cost_dnn1)
+            #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn1.csv', data_io_visited_cost_dnn1)
+            #write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
+            #write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
+            #write_dataset_csv('./DADOS_RESULTADOS/comp.csv', data_io_comp)
+            #write_dataset_csv('./DADOS_RESULTADOS/all.csv', data_io_all)
+
+            print('Tempo: ' + str(time() - start_time) + ' segundos')
+        
 
 if __name__ == '__main__':
     main()
