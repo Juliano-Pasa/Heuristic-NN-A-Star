@@ -37,6 +37,20 @@ def r2_distance(x1, x2, y1, y2):
 def r3_distance(x1, x2, y1, y2, z1, z2):
     return np.sqrt((r2_distance(x1,x2,y1,y2) ** 2) + ((z1 - z2) ** 2))
 
+def calcula_angulo(vert,vert1):
+    if vert is None or vert1 is None:
+        return math.inf
+    if vert == vert1:
+        return math.inf
+    #if vertex1.get_id()==vertex2.get_id()
+    #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
+    altura = abs(vert.get_elevation()-vert1.get_elevation())
+    hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
+    seno = altura/hipotenusa
+    #print("hipotenusa: ", hipotenusa)
+    #print("lalala seno: ",math.degrees(math.sin(seno)))
+    return math.degrees(math.sin(seno))
+
 
 class Mde:
     # https://rasterio.readthedocs.io/en/latest/quickstart.html
@@ -89,6 +103,7 @@ class Vertex:
         self.elevation = elevation
         self.id = node_id
         self.edges = {}
+        self.angles = {}
         self.distance = 99999999    # Somatório da distância percorrida da origem até o vértice
         self.risk = 99999999    # Somatório do grau de visibilidade da origem até o vértice
         self.previous = None
@@ -100,8 +115,10 @@ class Vertex:
     def get_previous(self):
         return self.previous
 
-    def add_edge(self, node_id, edge_weight):
+    def add_edge(self, node_id, edge_weight, g):
         self.edges[node_id] = edge_weight
+        edge = g.get_vertex(node_id)
+        self.angles[node_id] = calcula_angulo(self, edge)
         
     def get_visited(self):
         return self.visited
@@ -148,6 +165,13 @@ class Vertex:
         if (self.edges[vertex_id] is None):
             return None
         return self.edges[vertex_id]
+    
+    def get_edge_angle(self, vertex_id):
+        if self.get_id() == vertex_id:
+            return math.inf
+        if (self.angles[vertex_id] is None):
+            return None
+        return self.angles[vertex_id]
 
     def set_previous(self, prev):
         self.previous = prev
@@ -192,7 +216,7 @@ class Graph:
         self.max_edge = 0.0
         self.min_edge = float("inf")
         self.create_vertices(mde)   # Popula o dicionário de vértices com 1 vértice para cada célula do grid do mde
-        self.generate_edges(False)  # Parâmetro: True = considera as travessias diagonais; False = considera apenas os vizinhos imediatos
+        self.generate_edges(True)  # Parâmetro: True = considera as travessias diagonais; False = considera apenas os vizinhos imediatos
 
     def __iter__(self):
         return iter(self.vertices.values())
@@ -252,7 +276,7 @@ class Graph:
                         self.max_edge = weight
                     if weight < self.min_edge:
                         self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
+                    vertex.add_edge(vertex2_id, weight, self)
 
 
             j1 = j - 1
@@ -267,7 +291,7 @@ class Graph:
                         self.max_edge = weight
                     if weight < self.min_edge:
                         self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
+                    vertex.add_edge(vertex2_id, weight, self)
 
 
             j1 = j
@@ -282,7 +306,7 @@ class Graph:
                         self.max_edge = weight
                     if weight < self.min_edge:
                         self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
+                    vertex.add_edge(vertex2_id, weight, self)
 
             j1 = j
             i1 = i - 1
@@ -296,7 +320,7 @@ class Graph:
                         self.max_edge = weight
                     if weight < self.min_edge:
                         self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
+                    vertex.add_edge(vertex2_id, weight, self)
 
             if diagonal:
                 j1 = j + 1
@@ -311,7 +335,7 @@ class Graph:
                             self.max_edge = weight
                         if weight < self.min_edge:
                             self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
+                        vertex.add_edge(vertex2_id, weight, self)
 
                 j1 = j - 1
                 i1 = i + 1
@@ -325,7 +349,7 @@ class Graph:
                             self.max_edge = weight
                         if weight < self.min_edge:
                             self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
+                        vertex.add_edge(vertex2_id, weight, self)
 
                 j1 = j + 1
                 i1 = i - 1
@@ -339,7 +363,7 @@ class Graph:
                             self.max_edge = weight
                         if weight < self.min_edge:
                             self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
+                        vertex.add_edge(vertex2_id, weight, self)
 
                 j1 = j - 1
                 i1 = i - 1
@@ -353,7 +377,7 @@ class Graph:
                             self.max_edge = weight
                         if weight < self.min_edge:
                             self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
+                        vertex.add_edge(vertex2_id, weight, self)
 
     # Passa os valores de visbilidade [0, 1] para [0, max(edge) - min(edge)]
     def normalize_visibility(self, visibility):
@@ -387,19 +411,7 @@ def heuristica_padrao(start,goal):
 
 
 
-def calcula_angulo(vert,vert1):
-    if vert is None or vert1 is None:
-        return math.inf
-    if vert == vert1:
-        return math.inf
-    #if vertex1.get_id()==vertex2.get_id()
-    #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
-    altura = abs(vert.get_elevation()-vert1.get_elevation())
-    hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
-    seno = altura/hipotenusa
-    #print("hipotenusa: ", hipotenusa)
-    #print("lalala seno: ",math.degrees(math.sin(seno)))
-    return math.degrees(math.sin(seno))
+
     
 def calcula_hipotenusa(vertex1,vertex2,g):
     #aqui é feito o calculo onde é verificado se o caminho está "bloquado", levando em consideração se de um ponto ao outro a elevação é maior que 30%
@@ -487,10 +499,11 @@ def line_of_sight1(s,s1,g):#original
             
             vert_src = g.get_vertex_by_coords(x0,y0)
             vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
+            vert_id = vert_tgt.get_id()
             #print("aaaaa vertex1 550",vert)
             #print("aaaaa vertex2 550",vert1)
             #print("vert1 e 2 peso", vert.get_edge_weight(vert1.get_id()))
-            if m == 0:
+            '''if m == 0:
                 multiplicador=1
             else:
                 x_mult = calcula_x(y0,m,n)
@@ -498,21 +511,25 @@ def line_of_sight1(s,s1,g):#original
                 multiplicador = r2_distance(x0,x_mult,y0,y_mult)
             flag, valor = calcula_custo_theta(vert_src,vert_tgt,multiplicador)
             if(flag):
-                cost = cost + valor
+                cost = cost + valor'''
 
 
             
             #idinicial=get_id_by_coords(x0,y0)
             if f>= dx:
-                if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
+                if (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:#g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))):
                     #print("ENTREI AQUI")
                     return False, math.inf
                 y0 = y0 + sy
                 f = f - dx
 
-            if f!=0 and calcula_angulo(vert_src, vert_tgt)>ANGULO_MAX:
+            if f!=0 and (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
                 return False, math.inf
-            if dy==0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 - 1))>ANGULO_MAX:
+            new_vert1= get_id_by_coords(x0 + int((((sx-1)/2))),y0)
+            #new_vert_id1=new_vert1.get_id()
+            new_vert2= get_id_by_coords(x0 + int((((sx-1)/2))),y0 - 1)
+            #new_vert_id2=new_vert2.get_id()
+            if dy==0 and (vert_src.get_edge_angle(new_vert1))>ANGULO_MAX and (vert_src.get_edge_angle(new_vert2))>ANGULO_MAX:
                 return False, math.inf
             #cost = cost + (g.get_vertex(get_id_by_coords(x0 + int((sx-1)/2),y0 + int((sy-1)/2))).get_elevation()/2)
             x0 = x0 + sx
@@ -529,8 +546,8 @@ def line_of_sight1(s,s1,g):#original
             #y0 + int((sy-1)/2) = y0 + int((sy-1)/2)
             vert_src = g.get_vertex_by_coords(x0,y0)
             vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
-
-            if m == 0:
+            vert_id = vert_tgt.get_id()
+            '''if m == 0:
                 multiplicador=1
             else:
                 x_mult = calcula_x(y0,m,n)
@@ -538,23 +555,26 @@ def line_of_sight1(s,s1,g):#original
                 multiplicador = r2_distance(x0,x_mult,y0,y_mult)
             flag, valor = calcula_custo_theta(vert_src,vert_tgt,multiplicador)
             if(flag):
-                cost = cost + valor
+                cost = cost + valor'''
 
             #print("aaaaa vertex1 550",vert)
             if f >= dy:
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
-                if calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
+                if (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
                     return False, math.inf
                 
                 x0 = x0 + sx
                 f = f - dy
 
-            if f != 0 and calcula_angulo(vert_src,vert_tgt)>ANGULO_MAX:
+            if f != 0 and (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
                 return False, math.inf
             
+            new_vert1= get_id_by_coords(x0,y0 + int((sy-1)/2))
+            #new_vert_id1=new_vert1.get_id()
+            new_vert2= get_id_by_coords(x0 - 1,y0 + int((sy-1)/2))
             
-            if dx == 0 and calcula_angulo(vert_src, g.get_vertex_by_coords(x0,y0 + int((sy-1)/2)))>ANGULO_MAX and calcula_angulo(vert_src, g.get_vertex_by_coords(x0 - 1,y0 + int((sy-1)/2)))>ANGULO_MAX:
+            if dx == 0 and (vert_src.get_edge_angle(new_vert1))>ANGULO_MAX and (vert_src.get_edge_angle(new_vert2))>ANGULO_MAX:
                 vert = g.get_vertex_by_coords(x0,y0)
                 #print("aaaaa vertex",vert)
                 return False, math.inf
@@ -744,13 +764,13 @@ def theta_rapido(g, start, goal, v_weight, heuristic):
             
             grand_father = current.get_previous()
             
-            grand_son_risk = new_risk + grand_father.get_risk() 
             
             flag,cost =line_of_sight1(grand_father, next, g)
             if grand_father is not None and flag:
+                grand_son_risk = new_risk + grand_father.get_risk() 
                 '''r3_heuristic(grand_father,next)'''
-                if grand_father.get_distance() + cost + grand_son_risk * visibility_weight < next.get_distance() + visibility_weight * next.get_risk():
-                    next.set_distance(grand_father.get_distance() + cost)
+                if grand_father.get_distance() + r3_heuristic(grand_father,next) + grand_son_risk * visibility_weight < next.get_distance() + visibility_weight * next.get_risk():
+                    next.set_distance(grand_father.get_distance() + r3_heuristic(grand_father,next))
                     next.set_previous(grand_father)
                     next.set_risk(grand_son_risk)
                     
@@ -1550,8 +1570,8 @@ def main():
     args = sys.argv
     #filename = args[1] # recorte .tif do terreno
     '''model_1_10.hdf5''' 
-    model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
-    model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+    #model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+   # model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
@@ -1564,8 +1584,8 @@ def main():
 
     # Carrega os modelos das redes neurais treinadas
     #model1 = load_model(model_name1)
-    model1 = load_model(model_name1)
-    model2 = load_model(model_name2)
+   # model1 = load_model(model_name1)
+   # model2 = load_model(model_name2)
     print('Iniciando')
 
     for mp in GenerateVars.maps:
@@ -1686,8 +1706,8 @@ def main():
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
             for pair in combinations:
-                src_coords = pair[0] #pair[0](128,192)
-                dest_coords = pair[1] #pair[1](58,92)
+                src_coords = (128,192) #pair[0](128,192)
+                dest_coords = (58,92) #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
                 source = g.get_vertex(source_id)
                 #print("aaaa",source)
@@ -1698,8 +1718,8 @@ def main():
                 #print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
                 #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
                 
-                dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
-                dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+             #   dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
+              #  dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
 
                 #4 casos:
                 #1) A* simples, heurística r3
@@ -1709,36 +1729,36 @@ def main():
                 opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
                 t1 = time() - t1
                 path1 = [dest.get_id()]
-                #print("custo do a*: ",cost1)
-                #print("nodos visitados: ",count_visited1)
-                #print("nodos abertos: ",count_open1)
+                print("custo do a*: ",cost1)
+                print("nodos visitados: ",count_visited1)
+                print("nodos abertos: ",count_open1)
                 count_visible1 = count_visible_nodes(dest, path1, 0)
                 path_len1 = len(path1)
-                #print("tempo de duração: ", t1)
+                print("tempo de duração: ", t1)
                 g.reset()
 
                 #print("terminou A*\n")
 
-                #2)A* adaptado, heuristica r3 e caminhos seguros
+                '''#2)A* adaptado, heuristica r3 e caminhos seguros
                 b=0
                 heuristic = dict_dnn_heuristic2
                 
                 t2 = time()
                 opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic)
                 t2 = time() - t2
-                #print("custo do A* topografico dnn custo: ",cost2)
-                #print("nodos visitados: ",count_visited2)
-                #print("nodos abertos: ",count_open2)
+                print("custo do A* topografico dnn custo: ",cost2)
+                print("nodos visitados: ",count_visited2)
+                print("nodos abertos: ",count_open2)
                 
                 path2 = [dest.get_id()]
                 count_visible2 = count_visible_nodes(dest, path2, 0)
                 path_len2 = len(path2)
-                #print("tempo de duração: ", t2)
-                #print("Terminou A* topo\n")
-                g.reset()
+                print("tempo de duração: ", t2)
+                print("Terminou A* topo\n")
+                g.reset()'''
 
                 #3)Theta* adaptado, heuristica r3 e calculo de angulo
-                '''b=0
+                b=0
                 heuristic = r3_heuristic
                 
                 t3 = time()
@@ -1754,13 +1774,13 @@ def main():
                 path3 = [dest.get_id()]
                 count_visible3 = count_visible_nodes(dest, path3, 0)
                 path_len3 = len(path3)
-                g.reset()'''
+                g.reset()
                 
                 
                 #data_io_time_cost_r3.write("""%s;%s\n""" % (t2, cost2))
                 #data_io_visited_cost_r3.write("""%s;%s\n""" % (count_visited2, cost2))
                 
-                #4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
+                '''#4) A* adaptado, heuristica DNN1 (treinado sem visibilidade)
                 heuristic = dict_dnn_heuristic1
                 t4 = time()
                 opened4, count_visited4, count_open4, visited4, cost4 = astar_correction_factor(g, source, dest, b, heuristic)
@@ -1776,7 +1796,7 @@ def main():
                 #print("tempo do mapeamente heurístico: ", h_map_time1)
                 #print("Terminou A* com dnn\n")
                 
-                g.reset()
+                g.reset()'''
 
                 #data_io_time_cost_dnn1.write("""%s;%s\n""" % (t4, cost4))
                 #data_io_visited_cost_dnn1.write("""%s;%s\n""" % (count_visited4, cost4))
@@ -1820,9 +1840,9 @@ def main():
                 #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
 
                 data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
-                data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
+                #data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
                 #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
-                data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
+                #data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
                 #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
                 
 
@@ -1862,9 +1882,8 @@ def main():
                     write_dataset_test_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
                     break
 
-
+                break #realizando testes
                 
-
                 #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
                 #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
             write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp)
@@ -1882,6 +1901,7 @@ def main():
 
             print('Tempo: ' + str(time() - start_time) + ' segundos')
         
+        break #realizando testes tirar depois
 
 if __name__ == '__main__':
     main()
