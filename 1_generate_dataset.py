@@ -530,7 +530,7 @@ def generate_sssp_arrays(g):
             V.append(edges_index)
             for u_id in v.get_neighbors():
                 E.append(u_id)
-                print("\n\n\n\n aaaaaaaaaaaaa socorro", v.edges[u_id])
+                #print("\n\n\n\n aaaaaaaaaaaaa socorro", v.edges[u_id])
                 W.append(v.edges[u_id])
            # exit()  
 
@@ -845,14 +845,26 @@ def generate_dataset_with_vpconfigs():
             C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
 
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-            for dest_coords in sample_coords[aux+1:]:
-                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-            aux = aux +1
-
-            write_dataset_csv('./dataset_com_observador_mapa_/dataset_'+str(vpconfig)+'_'+str(sampling_rate)+'.csv', data_io)
+            if(GenerateVars.type_dataset == 1):
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                aux = aux +1
+            elif(GenerateVars.type_dataset == 2):
+                for dest_coords in sample_coords[aux+1:]:
+                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, 
+                    int(src_coords[1] * CELL_WIDTH),
+                    int(src_coords[0] * CELL_HEIGHT),
+                    mde.grid[src_coords[0], src_coords[1]], 
+                    int(dest_coords[1] * CELL_WIDTH),
+                    int(dest_coords[0] * CELL_HEIGHT), 
+                    mde.grid[dest_coords[0], dest_coords[1]], 
+                    C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
+                    
+            write_dataset_csv('./dataset_com_observador_CF_mapa/dataset_'+str(vpconfig)+'_'+str(sampling_rate)+'.csv', data_io)
         print('Tempo: ' + str(process_time() - start_time) + ' segundos')
 
     print('Dataset gerado com sucesso!')

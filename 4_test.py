@@ -49,7 +49,7 @@ def calcula_angulo(vert,vert1):
     seno = altura/hipotenusa
     #print("hipotenusa: ", hipotenusa)
     #print("lalala seno: ",math.degrees(math.sin(seno)))
-    return math.degrees(math.sin(seno))
+    return math.degrees(math.asin(seno))
 
 
 class Mde:
