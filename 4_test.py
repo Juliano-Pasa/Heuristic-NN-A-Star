@@ -1237,7 +1237,6 @@ def generatePath(current, currentReversed, start, goal, expanded, expandedRevers
 def biastar(g, start, goal, v_weight, heuristic):
     visited = [] #visitados e abertos
     visitedReverse = []
-    reverse = False
 
     # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
     start.set_risk(start.get_local_risk())
@@ -1250,20 +1249,13 @@ def biastar(g, start, goal, v_weight, heuristic):
     heapq.heapify(unvisited_queue)
     unvisited_queue_reverse = [(hscore, start)]
     heapq.heapify(unvisited_queue_reverse)
-    #opened = [(start, hscore)]  
-    #openedReverse = [(goal, hscore)]
 
     count_open = 2
     count_visited = 0
     i = 0
     i += 1
-    best = math.inf
     
-    while len(unvisited_queue) and len(unvisited_queue_reverse):
-        best = math.inf
-        save = 0
-
-        
+    while len(unvisited_queue) and len(unvisited_queue_reverse):        
         if(len(unvisited_queue)):   #if not reverse:
             uv = heapq.heappop(unvisited_queue)
             current = uv[1]
@@ -1275,7 +1267,7 @@ def biastar(g, start, goal, v_weight, heuristic):
                 next = g.get_vertex(next_id)
                 new_dist = current.get_distance() + heuristic(current, next) 
 
-                if next.has_parent(): #and next != current.get_previous:
+                if next.has_parent() and next in visitedReverse:
                     print("ESTOROU NO 1276")
                     
                     if current.has_parent() and next == current.get_previous():
@@ -1303,7 +1295,7 @@ def biastar(g, start, goal, v_weight, heuristic):
                 next = g.get_vertex(next_id)
                 new_dist = current.get_distance() + heuristic(current, next) 
 
-                if current.has_parent() and next == current.get_previous():
+                if next.has_parent() and next in visited:
                     print("ESTOROU NO 1302")
                     if next == current.get_previous():
                         break
