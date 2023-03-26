@@ -1201,8 +1201,8 @@ def astar(g, start, goal, v_weight, heuristic):
                     #opened.append(next.get_coordinates())'''
 
 #Backtrack do BiA*
-def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open):
-    distance = current.get_distance() + currentReversed.get_distance()
+def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open, heuristic):
+    distance = current.get_distance() + currentReversed.get_distance() + heuristic(current, currentReversed)
     path = []
     count_visited = 0
 
@@ -1268,11 +1268,7 @@ def biastar(g, start, goal, v_weight, heuristic):
                 new_dist = current.get_distance() + heuristic(current, next) 
 
                 if next.has_parent() and next in visitedReverse:
-                    print("ESTOROU NO 1276")
-                    
-                    if current.has_parent() and next == current.get_previous():
-                        break
-                    return generatePath(current, next, start, goal, visited, visitedReverse, v_weight, count_open)
+                    return generatePath(current, next, start, goal, visited, visitedReverse, v_weight, count_open, heuristic)
 
                 if new_dist < next.get_distance():
                     next.set_previous(current)
@@ -1296,10 +1292,7 @@ def biastar(g, start, goal, v_weight, heuristic):
                 new_dist = current.get_distance() + heuristic(current, next) 
 
                 if next.has_parent() and next in visited:
-                    print("ESTOROU NO 1302")
-                    if next == current.get_previous():
-                        break
-                    return generatePath(next, current, start, goal, visited, visitedReverse, v_weight, count_open)
+                    return generatePath(next, current, start, goal, visited, visitedReverse, v_weight, count_open, heuristic)
 
                 if new_dist < next.get_distance():
                     next.set_previous(current)
