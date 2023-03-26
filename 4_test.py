@@ -1200,6 +1200,131 @@ def astar(g, start, goal, v_weight, heuristic):
                     #count_open = count_open + 1
                     #opened.append(next.get_coordinates())'''
 
+#Backtrack do BiA*
+def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open):
+    distance = current.get_distance() + currentReversed.get_distance()
+    path = []
+    count_visited = 0
+
+    print("salvando o path\n")
+    while currentReversed.get_id() != goal.get_id():
+        print("Reversed ID")
+        print(currentReversed.get_id())
+        print("Goal ID")
+        print(goal.get_id())
+        print("Start ID")
+        print(start.get_id())
+        path.append(currentReversed.get_coordinates())
+        currentReversed = currentReversed.get_previous()
+
+    path.append(currentReversed.get_coordinates())
+    path = path[::-1]
+
+    while current.get_id() != start.get_id():
+        path.append(current.get_coordinates())
+        current = current.get_previous()
+
+    path.append(current.get_coordinates())
+
+    expanded.extend(expandedReverse)
+    closed_nodes = list(map(lambda v: v.get_coordinates(), expanded))
+    return closed_nodes, len(path), count_open, path, distance
+
+    return current.get_distance(), v_weight * current.get_risk(), count_visited, count_open, closed_nodes, path, distance
+
+
+#Bidirectional A*
+def biastar(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = [] #visitados e abertos
+    openedReverse = []
+    visitedReverse = []
+    reverse = False
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+    goal.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + heuristic(start, goal)
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+    unvisited_queue_reverse = [(hscore, start)]
+    heapq.heapify(unvisited_queue_reverse)
+    #opened = [(start, hscore)]  
+    #openedReverse = [(goal, hscore)]
+
+    count_open = 2
+    count_visited = 0
+    i = 0
+    i += 1
+    best = math.inf
+    opened.append(start.get_coordinates())
+    openedReverse.append(goal.get_coordinates())
+    
+    while len(unvisited_queue) and len(unvisited_queue_reverse):
+        best = math.inf
+        save = 0
+
+        
+        if(len(unvisited_queue)):   #if not reverse:
+            uv = heapq.heappop(unvisited_queue)
+            current = uv[1]
+            current.set_visited(True)
+            count_visited = count_visited + 1
+            visited.append(current.get_coordinates())
+
+            for next_id in current.get_neighbors():
+                next = g.get_vertex(next_id)
+                new_dist = current.get_distance() + heuristic(current, next) 
+
+                if next.has_parent(): #and next != current.get_previous:
+                    print("ESTOROU NO 1276")
+                    
+                    if current.has_parent() and next == current.get_previous():
+                        break
+                    return generatePath(current, next, start, goal, visited, visitedReverse, v_weight, count_open)
+
+                if new_dist < next.get_distance():
+                    next.set_previous(current)
+                    next.set_distance(new_dist)
+
+                    hscore = new_dist + heuristic(next, goal)
+
+                    if not next.visited:
+                        heapq.heappush(unvisited_queue, (hscore, next))
+                        count_open = count_open + 1
+                        opened.append(next.get_coordinates())
+
+        if(len(unvisited_queue_reverse)): #else: # REVERSED
+            uv = heapq.heappop(unvisited_queue_reverse)
+            current = uv[1]
+            current.set_visited(True)
+            count_visited = count_visited + 1
+            visitedReverse.append(current.get_coordinates())
+            
+            for next_id in current.get_neighbors():
+                next = g.get_vertex(next_id)
+                new_dist = current.get_distance() + heuristic(current, next) 
+
+                if current.has_parent() and next == current.get_previous():
+                    print("ESTOROU NO 1302")
+                    if next == current.get_previous():
+                        break
+                    return generatePath(next, current, start, goal, visited, visitedReverse, v_weight, count_open)
+
+                if new_dist < next.get_distance():
+                    next.set_previous(current)
+                    next.set_distance(new_dist)
+
+                    hscore = new_dist + heuristic(next, start)
+
+                    if not next.visited:
+                        heapq.heappush(unvisited_queue_reverse, (hscore, next))
+                        count_open = count_open + 1
+                        openedReverse.append(next.get_coordinates())
+
 def astarmod(g, start, goal, v_weight, heuristic):
     opened = []
     visited = []
@@ -1587,9 +1712,18 @@ def main():
    # model1 = load_model(model_name1)
    # model2 = load_model(model_name2)
     print('Iniciando')
-
-    for mp in GenerateVars.maps:
-        map_path = GenerateVars.maps_dir + mp.filename
+    
+    if(GenerateVars.use_viewpoints):
+        maps = [GenerateVars.vps_map]
+    else:
+        maps = GenerateVars.maps
+        
+    for mp in maps:
+        if(GenerateVars.use_viewpoints):
+            map_dir = GenerateVars.vps_map_dir
+        else:
+            map_dir = GenerateVars.maps_dir
+        map_path = map_dir + mp.filename
         print('Criando o grafo')
         mde = Mde(map_path, mp.reduction_factor)
         print(mp.filename)
@@ -1762,14 +1896,14 @@ def main():
                 heuristic = r3_heuristic
                 
                 t3 = time()
-                opened3, count_visited3, count_open3, visited3, cost3 = theta_rapido(g, source, dest, b, heuristic)
+                opened3, count_visited3, count_open3, visited3, cost3 = biastar(g, source, dest, b, heuristic)
                 #return visited, len(path), count_open, path, distance
                 t3 = time() - t3
-                print("custo do theta: ",cost3)
+                print("custo do biastar: ",cost3)
                 print("nodos visitados: ",count_visited3)
                 print("nodos abertos: ",count_open3)
                 print("tempo de duração: ", t3)
-                print("Terminou theta\n")
+                print("Terminou biastar\n")
                 
                 path3 = [dest.get_id()]
                 count_visible3 = count_visible_nodes(dest, path3, 0)
