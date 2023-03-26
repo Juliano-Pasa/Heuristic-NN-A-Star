@@ -1235,9 +1235,7 @@ def generatePath(current, currentReversed, start, goal, expanded, expandedRevers
 
 #Bidirectional A*
 def biastar(g, start, goal, v_weight, heuristic):
-    opened = []
     visited = [] #visitados e abertos
-    openedReverse = []
     visitedReverse = []
     reverse = False
 
@@ -1260,8 +1258,6 @@ def biastar(g, start, goal, v_weight, heuristic):
     i = 0
     i += 1
     best = math.inf
-    opened.append(start.get_coordinates())
-    openedReverse.append(goal.get_coordinates())
     
     while len(unvisited_queue) and len(unvisited_queue_reverse):
         best = math.inf
@@ -1295,7 +1291,6 @@ def biastar(g, start, goal, v_weight, heuristic):
                     if not next.visited:
                         heapq.heappush(unvisited_queue, (hscore, next))
                         count_open = count_open + 1
-                        opened.append(next.get_coordinates())
 
         if(len(unvisited_queue_reverse)): #else: # REVERSED
             uv = heapq.heappop(unvisited_queue_reverse)
@@ -1323,7 +1318,6 @@ def biastar(g, start, goal, v_weight, heuristic):
                     if not next.visited:
                         heapq.heappush(unvisited_queue_reverse, (hscore, next))
                         count_open = count_open + 1
-                        openedReverse.append(next.get_coordinates())
 
 def astarmod(g, start, goal, v_weight, heuristic):
     opened = []
