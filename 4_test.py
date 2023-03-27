@@ -1208,12 +1208,6 @@ def generatePath(current, currentReversed, start, goal, expanded, expandedRevers
 
     print("salvando o path\n")
     while currentReversed.get_id() != goal.get_id():
-        print("Reversed ID")
-        print(currentReversed.get_id())
-        print("Goal ID")
-        print(goal.get_id())
-        print("Start ID")
-        print(start.get_id())
         path.append(currentReversed.get_coordinates())
         currentReversed = currentReversed.get_previous()
 
@@ -1221,12 +1215,6 @@ def generatePath(current, currentReversed, start, goal, expanded, expandedRevers
     path = path[::-1]
 
     while current.get_id() != start.get_id():
-        print("Reversed ID")
-        print(currentReversed.get_id())
-        print("Goal ID")
-        print(goal.get_id())
-        print("Start ID")
-        print(start.get_id())
         path.append(current.get_coordinates())
         current = current.get_previous()
 
@@ -1258,24 +1246,24 @@ def biastar(g, start, goal, v_weight, heuristic):
     i = 0
     i += 1
     
-    while len(unvisited_queue) and len(unvisited_queue_reverse):        
-        if(len(unvisited_queue)):   #if not reverse:
+    while unvisited_queue and unvisited_queue_reverse:        
+        if(unvisited_queue):   #if not reverse:
             uv = heapq.heappop(unvisited_queue)
             current = uv[1]
             current.set_visited(True)
             count_visited = count_visited + 1
-            visited.append(current.get_coordinates())
+            visited.append(current.get_id())
 
             for next_id in current.get_neighbors():
                 next = g.get_vertex(next_id)
                 new_dist = current.get_distance() + heuristic(current, next) 
 
-                if next.get_coordinates() in visitedReverse:
+                if next.get_id() in visitedReverse:
                     openedR, count_visitedR, count_openR, visitedR, costR = generatePath(current, next, start, goal, visited, visitedReverse, v_weight, count_open, heuristic)
                     return openedR, count_visitedR, count_openR, visitedR, costR
 
                 if next.has_parent():
-                    if next.get_previous().get_coordinates() in visitedReverse:
+                    if next.get_previous().get_id() in visitedReverse:
                         continue
 
                 if new_dist < next.get_distance():
@@ -1288,23 +1276,23 @@ def biastar(g, start, goal, v_weight, heuristic):
                         heapq.heappush(unvisited_queue, (hscore, next))
                         count_open = count_open + 1
 
-        if(len(unvisited_queue_reverse)): #else: # REVERSED
+        if(unvisited_queue_reverse): #else: # REVERSED
             uv = heapq.heappop(unvisited_queue_reverse)
             current = uv[1]
             current.set_visited(True)
             count_visited = count_visited + 1
-            visitedReverse.append(current.get_coordinates())
+            visitedReverse.append(current.get_id())
             
             for next_id in current.get_neighbors():
                 next = g.get_vertex(next_id)
                 new_dist = current.get_distance() + heuristic(current, next) 
 
-                if next.get_coordinates() in visited:
+                if next.get_id() in visited:
                     openedR, count_visitedR, count_openR, visitedR, costR = generatePath(next, current, start, goal, visited, visitedReverse, v_weight, count_open, heuristic)
                     return openedR, count_visitedR, count_openR, visitedR, costR
 
                 if next.has_parent():
-                    if next.get_previous().get_coordinates() in visited:
+                    if next.get_previous().get_id() in visited:
                         continue
 
                 if new_dist < next.get_distance():
