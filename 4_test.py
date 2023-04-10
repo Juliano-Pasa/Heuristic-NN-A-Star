@@ -2,6 +2,7 @@ import io
 import shutil
 import random
 import sys
+from matplotlib.ticker import MultipleLocator
 import numpy as np
 import math
 import csv
@@ -11,6 +12,7 @@ import glob
 from config_variables import TestVars, TestCase, GenerateVars
 
 import matplotlib.image as mpimg
+import matplotlib.pyplot as plt
 from time import time
 from time import process_time
 import pickle
@@ -1545,14 +1547,13 @@ def generate_sample_points(sampling_percentage):
 # Mapa heurístico da DNN com 6 entradas
 def heuristic_dict1_multiplos_mapas(g, model, goal):
     todos_vertices = g.get_vertices()
+    vertice_y = goal
+    (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
 
     dataset = []
     t1_start = time()
     for vertice_x in g:
-        vertice_y = goal
-
         (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
@@ -1686,8 +1687,8 @@ def main():
     args = sys.argv
     #filename = args[1] # recorte .tif do terreno
     '''model_1_10.hdf5''' 
-    #model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
-   # model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+    model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+    model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
@@ -2027,6 +2028,122 @@ def main():
             print('Tempo: ' + str(time() - start_time) + ' segundos')
         
         break #realizando testes tirar depois
+
+def main2():
+    maps = GenerateVars.maps
+    reduction_factor = 1
+
+    model_name1 = 'model_32_20230227-164136_checkpoint_19_0.0147.hdf5'
+    model_name2 = 'model_32_20230220-165452_checkpoint_97_0.2473.hdf5'
+
+    model1 = load_model(model_name1)
+    model2 = load_model(model_name2)
+
+    for mp in maps:
+        map_dir = GenerateVars.maps_dir
+        map_path = map_dir + mp.filename
+        mde = Mde(map_path, mp.reduction_factor)
+
+        g = Graph(mde)
+        paths_per_map = 1250
+
+        data_io_comp = io.StringIO()
+        data_io_comp.write("""cost;euclidean;absCost;cfCost\n""")
+
+        if not os.path.exists("./DADOS_RESULTADOS/"):
+            os.makedirs("./DADOS_RESULTADOS/")
+
+        write_dataset_csv('./DADOS_RESULTADOS/HeuristicsCosts'+str(mp.id_map)+'.csv', data_io_comp)
+
+        sampling_rate = 0.125
+        sample_coords = generate_sample_points(sampling_rate / 100)
+        aux = 0
+        combinations = []
+        for coords in sample_coords:
+            for coords2 in sample_coords[aux+1:]:
+                combinations.append([coords, coords2])
+            aux += 1
+
+        random.shuffle(combinations)
+        combinations = combinations[:paths_per_map]
+        
+        for pair in combinations:
+            src_coords = pair[0]
+            dest_coords = pair[1]
+            source_id = get_id_by_coords(src_coords[0], src_coords[1])
+            source = g.get_vertex(source_id)
+            dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
+            dest = g.get_vertex(dest_id)
+            global dnn_heuristic_dict1
+            global dnn_heuristic_dict2
+
+            dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
+            dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+
+            b=0
+            heuristic = dict_dnn_heuristic2            
+            openedAstar, count_visitedAstar, count_openAstar, visitedAstar, costAstar = astar(g, source, dest, b, heuristic)
+            g.reset()
+
+            euclidean = r3_heuristic(source, dest)
+            cfCost = euclidean * dict_dnn_heuristic1(source, dest)
+            absCost = dict_dnn_heuristic2(source, dest)
+
+            data_io_comp.write("""%s;%s;%s;%s\n""" %(costAstar, euclidean, absCost, cfCost))
+
+        write_dataset_csv('./DADOS_RESULTADOS/HeuristicsCosts'+str(mp.id_map)+'.csv', data_io_comp)
+
+def main3():
+    prefixes = ["A", "B", "C", "D", "E", "F", "G", "H"]
+
+    name = "recorte300x300"
+
+    for p in prefixes:
+        print(p)
+        filename = f"{name}{p}.tif"
+        outputFileName = f"{name}{p}"
+
+        reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
+
+        # Lê o arquivo do MDE e cria o grid do mapa
+        mde = Mde(filename, reduction_factor)
+
+        print('Criando o grafo')
+        # Cria o grafo a partir do grid do MDE
+        g = Graph(mde)
+
+        angles = []
+
+        for i in range(GRID_ROWS):
+            for j in range(GRID_COLS):
+                source_id = get_id_by_coords(i, j)
+                source = g.get_vertex(source_id)
+
+                if i != GRID_ROWS - 1:
+                    n1_id = get_id_by_coords(i+1, j)
+                    n1 = g.get_vertex(n1_id)
+                    angles.append(calcula_angulo(source, n1))
+
+                if j != GRID_COLS - 1:
+                    n2_id = get_id_by_coords(i, j+1)
+                    n2 = g.get_vertex(n2_id)
+                    angles.append(calcula_angulo(source, n2))
+
+        bins = range(41)
+
+        plt.hist(angles, bins=bins, color="grey")
+        plt.xlabel("Angles (degrees)")
+        plt.ylabel("Frequency")
+        plt.ylim(0, 31500)
+        ax = plt.gca()
+        ax.xaxis.set_minor_locator(MultipleLocator(5))
+        ax.grid(axis='y')
+        plt.savefig(outputFileName)
+        plt.cla()
+        # plt.show()
+
+    return angles
+
 
 if __name__ == '__main__':
     main()
