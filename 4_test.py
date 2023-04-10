@@ -9,6 +9,7 @@ import heapq
 import os
 import glob
 from config_variables import TestVars, TestCase, GenerateVars
+import multiprocessing
 
 import matplotlib.image as mpimg
 from time import time
@@ -26,6 +27,8 @@ from   tensorflow.keras.initializers import GlorotNormal, GlorotUniform, HeNorma
 from   tensorflow.keras.layers       import Dense, Dropout, Input
 from   tensorflow.keras.models       import load_model, Sequential
 from   tensorflow.keras.optimizers   import Adam
+import tensorflow.compat.v1 as tf1
+
 
 ANGULO_MAX =30
 
@@ -109,6 +112,8 @@ class Vertex:
         self.previous = None
         self.visited = False
         self.visitedReverse = False
+        self.j = self.get_j()
+        self.i = self.get_i()
 
     def __str__(self):
         return str(self.id) + ' elevation: ' + str(self.elevation) + ' coord: ' + str(self.get_r2_coordinates()) + ' edges: ' + str([x for x in self.edges.keys()]) + str([x for x in self.edges.values()])
@@ -140,10 +145,10 @@ class Vertex:
         return self.edges.keys()
 
     def get_x(self):
-        return self.get_j() * CELL_WIDTH
+        return self.j * CELL_WIDTH
 
     def get_y(self):
-        return self.get_i() * CELL_HEIGHT
+        return self.i * CELL_HEIGHT
 
     def get_i(self):
         return math.floor(self.id / GRID_ROWS)
@@ -1067,6 +1072,7 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
     visited = []
+    heuristic_time = 0
 
     visibility_weight = v_weight
 
@@ -1096,6 +1102,7 @@ def astar(g, start, goal, v_weight, heuristic):
             path=backtracking(current,start)
             
             #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
+            print("heuristic time: ", heuristic_time)
             return visited, len(path), count_open, path, distance
 
         current.set_visited(True)
@@ -1112,7 +1119,9 @@ def astar(g, start, goal, v_weight, heuristic):
                 next.set_distance(new_dist)
                 next.set_risk(new_risk)
 
+                t1 = time()
                 hscore = new_dist + heuristic(next, goal)
+                heuristic_time += time() - t1
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -1545,14 +1554,13 @@ def generate_sample_points(sampling_percentage):
 # Mapa heurístico da DNN com 6 entradas
 def heuristic_dict1_multiplos_mapas(g, model, goal):
     todos_vertices = g.get_vertices()
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
 
     dataset = []
-    t1_start = time()
-    for vertice_x in g:
-        vertice_y = goal
+    t1_start = time()    
 
+    for vertice_x in g:
         (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
@@ -1650,6 +1658,17 @@ def dnn_predict(start, goal, model, observer):
         data = [observer[0], observer[1], observer[2], x1, y1, alt1, x2, y2, alt2]
     return model.predict(np.array([data]))
 
+def consult_frozen_graph(start, goal):
+    (x1, y1, alt1) = start.get_r3_coordinates()
+    (x2, y2, alt2) = goal.get_r3_coordinates()
+
+    if x2 < x1 or (x2 == x1 and y2 < y1):
+        data = [[1, x2, y2, alt2, x1, y1, alt1]]
+    else:
+        data = [[1, x1, y1, alt1, x2, y2, alt2]]
+
+    data = np.array(data)
+    return session.run(output_tensor, {'x:0': data})[0][0]
 
 def observer_points(grid, n, m, r=10, spacing=4):  #divide o grid(n x m) em r x r regioes
     nr = (n)/r
@@ -1687,7 +1706,21 @@ def main():
     #filename = args[1] # recorte .tif do terreno
     '''model_1_10.hdf5''' 
     #model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
-   # model_name2 = 'dataset_sem_observador_mapa_padrao\model_withoutvps_heuristic\model_32_20230220-165452_checkpoint_100_0.2460.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+    model_name2 = 'model_32_20230220-165452_checkpoint_97_0.2473.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
+
+    global session
+    global output_tensor
+
+    session = tf1.InteractiveSession()
+    frozen_graph="./frozen_models/simple_frozen_graph.pb"
+
+    with tf1.gfile.GFile(frozen_graph, "rb") as f:
+        graph_def = tf1.GraphDef()
+        graph_def.ParseFromString(f.read())
+
+    session.graph.as_default()
+    tf1.import_graph_def(graph_def)    
+    output_tensor = session.graph.get_tensor_by_name("Identity:0")  
 
     reduction_factor = 1 # Fator de redução de dimensão do mapa (2 -> mapa 400x400 abstraído em 200x200)
 
@@ -1701,7 +1734,7 @@ def main():
     # Carrega os modelos das redes neurais treinadas
     #model1 = load_model(model_name1)
    # model1 = load_model(model_name1)
-   # model2 = load_model(model_name2)
+    model2 = load_model(model_name2)
     print('Iniciando')
     
     if(GenerateVars.use_viewpoints):
@@ -1709,7 +1742,7 @@ def main():
     else:
         maps = GenerateVars.maps
         
-    for mp in maps:
+    for mp in maps[:2]:
         if(GenerateVars.use_viewpoints):
             map_dir = GenerateVars.vps_map_dir
         else:
@@ -1723,7 +1756,7 @@ def main():
         viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
         print('Gerando os viewsheds')
     # Quantidade de caminhos para cada observador (100 X 1000)
-        paths_per_map = 100000
+        paths_per_map = 10
 
         start_time = time()
 
@@ -1831,30 +1864,62 @@ def main():
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
             for pair in combinations:
-                src_coords = (128,192) #pair[0](128,192)
-                dest_coords = (58,92) #pair[1](58,92)
+                src_coords = pair[0] #pair[0](128,192)
+                dest_coords = pair[1] #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
                 source = g.get_vertex(source_id)
                 #print("aaaa",source)
                 dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
                 dest = g.get_vertex(dest_id)
+                
                 global dnn_heuristic_dict1
                 global dnn_heuristic_dict2
                 #print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
                 #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
                 
              #   dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
-              #  dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+                dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+                print("tempo de duração mapa heuristico: ", h_map_time2)
 
                 #4 casos:
                 #1) A* simples, heurística r3
                 b=0
+                heuristic = dict_dnn_heuristic2
+                t1 = time()
+                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t1 = time() - t1
+                path1 = [dest.get_id()]
+                print("custo do a* mapa heuristico: ",cost1)
+                print("nodos visitados: ",count_visited1)
+                print("nodos abertos: ",count_open1)
+                count_visible1 = count_visible_nodes(dest, path1, 0)
+                path_len1 = len(path1)
+                print("tempo de duração: ", t1)
+                g.reset()
+
+                print("")
+
+                heuristic = consult_frozen_graph
+                t1 = time()
+                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t1 = time() - t1
+                path1 = [dest.get_id()]
+                print("custo do a* frozen graph: ",cost1)
+                print("nodos visitados: ",count_visited1)
+                print("nodos abertos: ",count_open1)
+                count_visible1 = count_visible_nodes(dest, path1, 0)
+                path_len1 = len(path1)
+                print("tempo de duração: ", t1)
+                g.reset()
+
+                print("")
+
                 heuristic = r3_heuristic
                 t1 = time()
                 opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
                 t1 = time() - t1
                 path1 = [dest.get_id()]
-                print("custo do a*: ",cost1)
+                print("custo do a* r3: ",cost1)
                 print("nodos visitados: ",count_visited1)
                 print("nodos abertos: ",count_open1)
                 count_visible1 = count_visible_nodes(dest, path1, 0)
@@ -2007,7 +2072,7 @@ def main():
                     write_dataset_test_csv('./DADOS_RESULTADOS/opened4.csv',data_io_opened4)
                     break
 
-                break #realizando testes
+                # break #realizando testes
                 
                 #data_io_all.write("""%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s;%s\n""" %
                 #                  (observer[0], observer[1], observer[2], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]],int(dest_coords[1] *CELL_WIDTH), int(dest_coords[0]*CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], cost4, distance4,safety4,count_visited4,t4, float(t3-h_map_time2), h_map_time2))
