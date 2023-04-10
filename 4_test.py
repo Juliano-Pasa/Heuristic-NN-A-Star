@@ -1639,11 +1639,10 @@ def heuristic_dict1_multiplos_mapas(g, model, goal, map_id):
 
     dataset = []
     t1_start = time()
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
     for vertice_x in g:
-        vertice_y = goal
 
         (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
@@ -1653,8 +1652,8 @@ def heuristic_dict1_multiplos_mapas(g, model, goal, map_id):
 
     # Monta um dicionário com as predições da DNN
     dataset = np.array(dataset)
-    with tf.device('/gpu:0'):
-        predicoes = model.predict_on_batch(dataset)
+    #with tf.device('/gpu:0'):
+    predicoes = model.predict(dataset, batch_size=32*1024)
 
     dict_heuristica = dict(zip(todos_vertices, predicoes))
 
@@ -1668,11 +1667,10 @@ def heuristic_dict2_observadores(g, model, goal,vp):
 
     dataset = []
     t1_start = time()
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
     for vertice_x in g:
-        vertice_y = goal
 
         (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
 
         # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
         if x2 < x1 or (x2 == x1 and y2 < y1):
@@ -1759,6 +1757,24 @@ def dict_dnn_heuristic2(start, goal):
     return predicao
 
 
+def dnn_predict_test(start, goal):
+    global model_test
+    (x1, y1, alt1) = start.get_r3_coordinates()  # current
+    (x2, y2, alt2) = goal.get_r3_coordinates()  # goal
+    id_map = 1 
+    # append array 2d
+    if x2 < x1 or (x2 == x1 and y2 < y1):
+        data = [id_map, x2, y2, alt2, x1, y1, alt1]
+    else:
+        data = [id_map, x1, y1, alt1, x2, y2, alt2]
+        
+    #print(tf.config.list_physical_devices('GPU'))
+    with tf.device('/gpu:0'):
+        val = model_test.predict(np.array([data]), batch_size=1)
+        #print("VALOR TESTE")
+        #print(val)
+    return val
+
 def dnn_predict(start, goal, model, observer):
     (x1, y1, alt1) = start.get_r3_coordinates()  # current
     (x2, y2, alt2) = goal.get_r3_coordinates()  # goal
@@ -1829,6 +1845,10 @@ def main():
     #model1 = load_model(model_name1)
     model_CF = load_model(model_name1)
     model_ABS = load_model(model_name2)
+    global model_test 
+    #with tf.device('/gpu:0'):
+    model_test = load_model(model_name1)
+    
     print('Iniciando')
     
     if(GenerateVars.use_viewpoints):
@@ -1928,7 +1948,7 @@ def main():
         
         # Realiza o mesmo processo para cada observador
         print(len(viewpoints))
-        for vpconfig in GenerateVars.vpconfigs:
+        for vpconfig in [1]:#GenerateVars.vpconfigs:
             #observer = (int(vpconfig[1] * CELL_WIDTH), int(vpconfig[0] * CELL_HEIGHT), mde.grid[vpconfig[0], vpconfig[1]])  # Coordenadas do observador
 
             data_io_time_cost_r3 = io.StringIO()
@@ -1949,11 +1969,11 @@ def main():
 
             b = 0.5  # Fator de importância da segurança no cálculo do custo
             #visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vpconfig[0]) + '_' + str(vpconfig[1]) + '.png'
-            visibility_map_file = './VIEWSHEDS/VIEWSHED_CONFIG_' + str(vpconfig) +'.png'
+            #visibility_map_file = './VIEWSHEDS/VIEWSHED_CONFIG_' + str(vpconfig) +'.png'
 
-            viewshed = read_viewshed(visibility_map_file)
-            viewshed = g.normalize_visibility(viewshed)
-            g.update_vertices_risk(viewshed)
+            #viewshed = read_viewshed(visibility_map_file)
+            #viewshed = g.normalize_visibility(viewshed)
+            #g.update_vertices_risk(viewshed)
             #viewshed = read_viewshed(visibility_map_file)
             #viewshed = g.normalize_visibility(viewshed) # Normalização dos valores de visibilidade -> do intervalo [0,1] para o intervalo [min(edge), max(edge)]
 
@@ -1978,8 +1998,8 @@ def main():
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
             for pair in combinations:
-                src_coords = (270,200) #pair[0](128,192)
-                dest_coords = (58,120) #pair[1](58,92)
+                src_coords = (1,1) #pair[0](128,192)
+                dest_coords = (280,280) #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
                 source = g.get_vertex(source_id)
                 #print("aaaa",source)
@@ -1991,6 +2011,7 @@ def main():
                 global dnn_heuristic_dict_CF_S
                 global dnn_heuristic_dict2_ABS_D
                 global dnn_heuristic_dict2_ABS_S
+                global dnn_heuristic_test
                 #print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
                 #carrega a heuristica entre todos os pontos para o ponto alvo posteriormente é usada como consulta
                 #print("A distancia em linha reta no r3 é: ",r3_heuristic(source,dest))
@@ -2019,7 +2040,9 @@ def main():
                 #4 casos:
                 #1) A* simples, heurística r3
                 #1) A* simples, heurística r3
-                '''b=0
+                
+                print("\nA* com heurística")
+                b=0
                 heuristic = r3_heuristic
                 t1 = time()
                 opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
@@ -2031,26 +2054,29 @@ def main():
                 count_visible1 = count_visible_nodes(dest, path1, 0)
                 path_len1 = len(path1)
                 print("tempo de duração: ", t1)
-                print("mapa heuristico ", tempo_aaaa)
+                #print("mapa heuristico ", tempo_aaaa)
                 #print("\n")
-                g.reset()'''
+                g.reset()
 
-                '''b=0
-                heuristic = dict_standard_heuristic
+                """b=0
+                heuristic = dnn_predict_test
                 t2 = time()
                 opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
                 t2 = time() - t2
                 path2 = [dest.get_id()]
-                print("custo do a*: ",cost2)
+                print("custo do a* TESTE: ",cost2)
                 print("nodos visitados: ",count_visited2)
                 print("nodos abertos: ",count_open2)
                 count_visible2 = count_visible_nodes(dest, path2, 0)
                 path_len2 = len(path2)
                 print("tempo de duração: ", t2)
-                print("mapa heuristico ", tempo_aaaa)
+                #print("mapa heuristico ", tempo_aaaa)
                 #print("\n")
-                g.reset()'''
+                g.reset()"""
                 
+                print("\nLISTAAAAAA")
+                print(tf.config.list_physical_devices('GPU'))
+                print("\nA* DNN Absoluto")
                 b=0
                 heuristic = dict_dnn_heuristic_abs_d
                 t3 = time()
@@ -2067,6 +2093,7 @@ def main():
                 #print("\n")
                 g.reset()
                 
+                print("\nA* Correction Factor")
                 b=0
                 heuristic = dict_dnn_heuristic_cf_d
                 t4 = time()
@@ -2121,6 +2148,7 @@ def main():
                 print("Terminou A* topo\n")
                 g.reset()'''
                 
+                print("\nBiA* DNN Absoluto")
                 b=0
                 heuristicABSD = dict_dnn_heuristic_abs_d
                 #heuristicABSS = dict_dnn_heuristic_abs_s
@@ -2139,6 +2167,7 @@ def main():
                 print("Terminou A* topo\n")
                 g.reset()
                 
+                print("\nBiA* Correction Factor")
                 b=0
                 heuristicABSD = dict_dnn_heuristic_cf_d
                 #heuristicABSS = dict_dnn_heuristic_abs_s
