@@ -1673,6 +1673,77 @@ def heuristic_dict1_multiplos_mapas(g, model, goal, map_id):
 
     return dict_heuristica, t1_stop - t1_start
 
+def heuristic_dict1_multiplos_mapas_iterative(g, model, current, goal, map_id):
+    dataset = []
+    t1_start = time()
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
+
+    ids = []
+    selected = []
+    current_i = current.get_i()
+    current_j = current.get_j()
+
+    expanding_factor = 24
+
+    for i in range(-expanding_factor, expanding_factor+1):
+        ids.append((current_i + i) * GRID_COLS + current_j)
+        for j in range(1, expanding_factor+1):
+            ids.append((current_i + i) * GRID_COLS + (current_j + j))
+            ids.append((current_i + i) * GRID_COLS + (current_j - j))
+
+    maximum = GRID_COLS * GRID_ROWS
+
+    for id in ids:
+        if id < 0 or id > maximum:
+            continue
+
+        vertex = g.get_vertex(id)
+        selected.append(id)
+        (x1, y1, alt1) = vertex.get_r3_coordinates() # current
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
+        
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    #with tf.device('/gpu:0'):
+    predicoes = model.predict_on_batch(dataset)
+
+    dict_heuristica = dict(zip(selected, predicoes))
+
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
+def heuristic_dict1_multiplos_mapas_frozen_graph(g, goal, map_id):
+    todos_vertices = g.get_vertices()
+    vertice_y = goal
+    (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+    dataset = []
+    t1_start = time()
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
+    for vertice_x in g:
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    result = session.run(output_tensor, {'x:0': dataset})
+    #with tf.device('/gpu:0'):
+    dict_heuristica = dict(zip(todos_vertices, result))
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start
+
 
 def heuristic_dict2_observadores(g, model, goal,vp):
     todos_vertices = g.get_vertices()
@@ -1768,6 +1839,21 @@ def dict_dnn_heuristic2(start, goal):
     predicao = dnn_heuristic_dict2[start.get_id()][0]
     return predicao
 
+def dict_frozen_graph(start, goal):
+    return dnn_heuristic_frozen[start.get_id()][0]
+
+def dict_dnn_iterative(start, goal):
+    value = 0
+    global dnn_heuristic_iterative
+
+    try:
+        value = dnn_heuristic_iterative[start.get_id()][0]
+
+    except KeyError:
+        dnn_heuristic_iterative, _ = heuristic_dict1_multiplos_mapas_iterative(g, model_test, start, goal, mapId)
+        value = dnn_heuristic_iterative[start.get_id()][0]
+
+    return value
 
 def dnn_predict_test(start, goal):
     global model_test
@@ -1803,11 +1889,11 @@ def consult_frozen_graph(start, goal):
     (x2, y2, alt2) = goal.get_r3_coordinates()
 
     if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [[1, x2, y2, alt2, x1, y1, alt1]]
+        data = [1, x2, y2, alt2, x1, y1, alt1]
     else:
-        data = [[1, x1, y1, alt1, x2, y2, alt2]]
+        data = [1, x1, y1, alt1, x2, y2, alt2]
 
-    data = np.array(data)
+    data = np.array([data, data])
     return session.run(output_tensor, {'x:0': data})[0][0]
 
 def dict_dnn_heuristic_abs_d(start, goal):
@@ -1853,14 +1939,14 @@ def main():
     args = sys.argv
     #filename = args[1] # recorte .tif do terreno
     '''model_1_10.hdf5''' 
-    model_name1 = 'model/model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
+    model_name1 = 'model_32_20230227-164136_checkpoint_19_0.0147.hdf5'#'modelo_249_epocas.hdf5' # # modelo 1 de DNN treinada (só para características topográficas)
     model_name2 = 'model_32_20230220-165452_checkpoint_97_0.2473.hdf5' # modelo 2 de DNN treinada (para características topográficas e posição do observador)
 
     global session
     global output_tensor
 
     session = tf1.InteractiveSession()
-    frozen_graph="./frozen_models/simple_frozen_graph.pb"
+    frozen_graph="./frozen_models/frozen_graph_abs_cost.pb"
 
     with tf1.gfile.GFile(frozen_graph, "rb") as f:
         graph_def = tf1.GraphDef()
@@ -1883,8 +1969,11 @@ def main():
     model_CF = load_model(model_name1)
     model_ABS = load_model(model_name2)
     global model_test 
+    global g
+    global mapId
+
     #with tf.device('/gpu:0'):
-    model_test = load_model(model_name1)
+    model_test = load_model(model_name2)
     
     print('Iniciando')
     
@@ -1898,6 +1987,8 @@ def main():
             map_dir = GenerateVars.vps_map_dir
         else:
             map_dir = GenerateVars.maps_dir
+        
+        mapId = mp.id_map
         map_path = map_dir + mp.filename
         print('Criando o grafo')
         mde = Mde(map_path, mp.reduction_factor)
@@ -2035,8 +2126,8 @@ def main():
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
             for pair in combinations:
-                src_coords = (1,1) #pair[0](128,192)
-                dest_coords = (280,280) #pair[1](58,92)
+                src_coords = pair[0] #pair[0](128,192)
+                dest_coords = pair[1] #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
                 source = g.get_vertex(source_id)
                 #print("aaaa",source)
@@ -2046,7 +2137,9 @@ def main():
                 global dnn_heuristic_dict1
                 global dnn_heuristic_dict2
                 global dnn_heuristic_dict_CF_D
+                global dnn_heuristic_frozen
                 global dnn_heuristic_dict_CF_S
+                global dnn_heuristic_iterative
                 global dnn_heuristic_dict2_ABS_D
                 global dnn_heuristic_dict2_ABS_S
                 global dnn_heuristic_test
@@ -2073,7 +2166,11 @@ def main():
                 #dnn_heuristic_dict2_ABS_S, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model_ABS, source,mp.id_map)
                 #4 casos:
              #   dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
-                dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model2, dest)
+                dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model_ABS, dest, mp.id_map)
+                dnn_heuristic_frozen, h_map_frozen = heuristic_dict1_multiplos_mapas_frozen_graph(g, dest, mp.id_map)
+                # dnn_heuristic_iterative, h_map_iterative = heuristic_dict1_multiplos_mapas_iterative(g, model_ABS, source, dest, mp.id_map)
+                dnn_heuristic_iterative = {}
+
                 print("tempo de duração mapa heuristico: ", h_map_time2)
 
                 #4 casos:
@@ -2127,162 +2224,41 @@ def main():
                 #print("\n")
                 g.reset()
 
-                """b=0
-                heuristic = dnn_predict_test
-                t2 = time()
-                opened2, count_visited2, count_open2, visited2, cost2 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t2 = time() - t2
-                path2 = [dest.get_id()]
-                print("custo do a* TESTE: ",cost2)
-                print("nodos visitados: ",count_visited2)
-                print("nodos abertos: ",count_open2)
-                count_visible2 = count_visible_nodes(dest, path2, 0)
-                path_len2 = len(path2)
-                print("tempo de duração: ", t2)
-                #print("mapa heuristico ", tempo_aaaa)
-                #print("\n")
-                g.reset()"""
-                
-                print("\nLISTAAAAAA")
-                print(tf.config.list_physical_devices('GPU'))
-                print("\nA* DNN Absoluto")
-                b=0
-                heuristic = dict_dnn_heuristic_abs_d
-                t3 = time()
-                opened3, count_visited3, count_open3, visited3, cost3 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t3 = time() - t3
-                path3 = [dest.get_id()]
-                print("custo do a*: ",cost3)
-                print("nodos visitados: ",count_visited3)
-                print("nodos abertos: ",count_open3)
-                count_visible3 = count_visible_nodes(dest, path3, 0)
-                path_len3 = len(path3)
-                print("tempo de duração: ", t3)
-                print("mapa heuristico ", h_map_time2)
-                #print("\n")
-                g.reset()
-                
-                print("\nA* Correction Factor")
-                b=0
-                heuristic = dict_dnn_heuristic_cf_d
-                t4 = time()
-                opened4, count_visited4, count_open4, visited4, cost4 = astar_correction_factor(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t4 = time() - t4
-                path4 = [dest.get_id()]
-                print("custo do a*: ",cost4)
-                print("nodos visitados: ",count_visited4)
-                print("nodos abertos: ",count_open4)
-                count_visible4 = count_visible_nodes(dest, path4, 0)
-                path_len4 = len(path4)
-                print("tempo de duração: ", t4)
-                print("mapa heuristico ", h_map_time1)
+                print("")
+
+                heuristic = dict_frozen_graph
+                t1 = time()
+                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t1 = time() - t1
+                path1 = [dest.get_id()]
+                print("custo do a* frozen_map: ",cost1)
+                print("nodos visitados: ",count_visited1)
+                print("nodos abertos: ",count_open1)
+                count_visible1 = count_visible_nodes(dest, path1, 0)
+                path_len1 = len(path1)
+                print("tempo de duração: ", t1)
+                print("mapa heuristico ", h_map_frozen)
                 #print("\n")
                 g.reset()
 
-                #print("terminou A*\n")
-                
-                #2)A* adaptado, heuristica r3 e caminhos seguros
-                '''b=0
-                heuristic = r3_heuristic
-                #heuristicABSS = dict_dnn_heuristic_abs_s
-                t5 = time()
-                opened5, count_visited5, count_open5, visited5, cost5 = biastar(g, source, dest, b, heuristic, heuristic)
-                t5 = time() - t5
-                print("custo do biA* topografico: ",cost5)
-                print("nodos visitados: ",count_visited5)
-                print("nodos abertos: ",count_open5)
-                
-                path5 = [dest.get_id()]
-                count_visible5 = count_visible_nodes(dest, path5, 0)
-                path_len5 = len(path5)
-                print("tempo de duração: ", t5)
-                print("Terminou A* topo\n")
-                g.reset()'''
-                
-                '''b=0
-                heuristicABSD = dict_standard_heuristic
-                #heuristicABSS = dict_dnn_heuristic_abs_s
-                t6 = time()
-                opened6, count_visited6, count_open6, visited6, cost6 = biastar(g, source, dest, b, heuristicABSD, heuristicABSD)
-                t6 = time() - t6
-                print("custo do biA* mapa heuristico: ",cost6)
-                print("nodos visitados: ",count_visited6)
-                print("nodos abertos: ",count_open6)
-                
-                path6 = [dest.get_id()]
-                count_visible6 = count_visible_nodes(dest, path6, 0)
-                path_len6 = len(path6)
-                print("tempo de duração: ", t6)
-                print("tempo do mapeamente heurístico: ", tempo_aaaa)
-                print("Terminou A* topo\n")
-                g.reset()'''
-                
-                print("\nBiA* DNN Absoluto")
-                b=0
-                heuristicABSD = dict_dnn_heuristic_abs_d
-                #heuristicABSS = dict_dnn_heuristic_abs_s
-                t7 = time()
-                opened7, count_visited7, count_open7, visited7, cost7 = biastar(g, source, dest, b, heuristicABSD, heuristicABSD)
-                t7 = time() - t7
-                print("custo do biA* dnn absoluto: ",cost7)
-                print("nodos visitados: ",count_visited7)
-                print("nodos abertos: ",count_open7)
-                
-                path7 = [dest.get_id()]
-                count_visible7 = count_visible_nodes(dest, path7, 0)
-                path_len7 = len(path7)
-                print("tempo de duração: ", t7)
-                print("tempo do mapeamente heurístico: ", h_map_time2)
-                print("Terminou A* topo\n")
-                g.reset()
-                
-                print("\nBiA* Correction Factor")
-                b=0
-                heuristicABSD = dict_dnn_heuristic_cf_d
-                #heuristicABSS = dict_dnn_heuristic_abs_s
-                t8 = time()
-                opened8, count_visited8, count_open8, visited8, cost8 = biastar_DNN_CF(g, source, dest, b, heuristicABSD, heuristicABSD)
-                t8 = time() - t8
-                print("custo do biA* dnn cf: ",cost8)
-                print("nodos visitados: ",count_visited8)
-                print("nodos abertos: ",count_open8)
-                
-                path8 = [dest.get_id()]
-                count_visible8 = count_visible_nodes(dest, path8, 0)
-                path_len8 = len(path8)
-                print("tempo de duração: ", t8)
-                print("tempo do mapeamente heurístico: ", h_map_time1)
-                print("Terminou A* topo\n")
-                g.reset()
-                #data_io_time_cost_r6.write("""%s;%s\n""" % (t2, cost2))
-                #data_io_visited_cost_r6.write("""%s;%s\n""" % (count_visited2, cost2))
-                '''
-                #4) A* adaptado, heuristica DNN2 (treinado com visibilidade)
-                heuristic = dict_dnn_heuristic2
-                t4 = time()
-                distance4, safety4, count_visited4, count_open4, opened4, visited4, cost4 = safe_astar(g, source, dest, b,
-                                                                                                    heuristic)
-                path4 = [dest.get_id()]
-                count_visible4 = count_visible_nodes(dest, path4, 0)
-                path_len4 = len(path4)
-                t4 = time() - t4 + h_map_time2
-                g.reset()'''
+                print("")
 
-                #data_io_time_cost_dnn2.write("""%s;%s\n""" % (t4, cost4))
-                #data_io_visited_cost_dnn2.write("""%s;%s\n""" % (count_visited4, cost4))
+                heuristic = dict_dnn_iterative
+                t1 = time()
+                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t1 = time() - t1
+                path1 = [dest.get_id()]
+                print("custo do a* iterative: ",cost1)
+                print("nodos visitados: ",count_visited1)
+                print("nodos abertos: ",count_open1)
+                count_visible1 = count_visible_nodes(dest, path1, 0)
+                path_len1 = len(path1)
+                print("tempo de duração: ", t1)
+                # print("mapa heuristico ", h_map_iterative)
+                #print("\n")
+                g.reset()
 
-                #data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
-                #data_io_comp2.write("""%s;%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2,h_map_time1))
-                data_io_comp3.write("""%s;%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3,h_map_time1))
-                data_io_comp4.write("""%s;%s;%s;%s;%s\n""" %(cost4,t4,count_visited4,count_open4,h_map_time1))
-                #data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
-                #data_io_comp6.write("""%s;%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6,h_map_time1))
-                data_io_comp7.write("""%s;%s;%s;%s;%s\n""" %(cost7,t7,count_visited7,count_open7,h_map_time1))
-                data_io_comp8.write("""%s;%s;%s;%s;%s\n""" %(cost8,t8,count_visited8,count_open8,h_map_time1))
-                #data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
-                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
-                #data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
-                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
+                break
                 
 
                 if teste:
