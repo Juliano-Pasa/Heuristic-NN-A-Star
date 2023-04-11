@@ -1020,7 +1020,6 @@ def safe_astar(g, start, goal, v_weight, heuristic):
 def astar_correction_factor(g, start, goal, v_weight, heuristic):
     opened = []
     visited = []
-    heuristic_time = 0
 
     visibility_weight = v_weight
 
@@ -1029,9 +1028,7 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    t1 = time()
     hscore = start.get_distance() + r3_heuristic(start, goal)*heuristic(start,goal)
-    heuristic_time += time() - t1
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
@@ -1051,7 +1048,6 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
             path=[]
             path=backtracking(current,start)
             
-            print("heuristic time: ", heuristic_time)
             #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
             return visited, len(path), count_open, path, distance
 
@@ -1069,9 +1065,7 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
                 next.set_distance(new_dist)
                 next.set_risk(new_risk)
                 #print("retorno do fator de correção",heuristic(next,goal))
-                t1 = time()
                 hscore = new_dist + r3_heuristic(next, goal)*heuristic(next,goal)
-                heuristic_time += time() - t1                
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -1091,9 +1085,7 @@ def astar(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    t1 = time()
     hscore = start.get_distance() + heuristic(start, goal)
-    heuristic_time += time() - t1
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
@@ -1422,7 +1414,7 @@ def biastar(g, start, goal, v_weight, heuristic, heuristic1):
                 next.set_previous(current)
                 next.set_distance(new_dist)
 
-                hscore = new_dist + heuristic1(next, start)
+                hscore = new_dist + heuristic1(next, goal)
 
                 if not next.visitedReverse:
                     heapq.heappush(unvisited_queue_reverse, (hscore, next))
@@ -1724,7 +1716,6 @@ def heuristic_dict1_multiplos_mapas_iterative(g, session, output_tensor, current
     # Monta um dicionário com as predições da DNN
     dataset = np.array(dataset)
     #with tf.device('/gpu:0'):
-    # predicoes = model.predict_on_batch(dataset)
     predicoes = session.run(output_tensor, {'x:0': dataset})
 
     dict_heuristica = dict(zip(selected, predicoes))
@@ -1886,7 +1877,7 @@ def dict_dnn_iterative_cf(start, goal):
     return value
 
 def dnn_predict_test(start, goal):
-    global session_abs
+    global model_test
     (x1, y1, alt1) = start.get_r3_coordinates()  # current
     (x2, y2, alt2) = goal.get_r3_coordinates()  # goal
     id_map = 1 
@@ -1898,7 +1889,7 @@ def dnn_predict_test(start, goal):
         
     #print(tf.config.list_physical_devices('GPU'))
     with tf.device('/gpu:0'):
-        val = session_abs.predict(np.array([data]), batch_size=1)
+        val = model_test.predict(np.array([data]), batch_size=1)
         #print("VALOR TESTE")
         #print(val)
     return val
@@ -2169,8 +2160,8 @@ def main():
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
             for pair in combinations:
-                src_coords = (128,192) #pair[0](128,192)
-                dest_coords = (58,92) #pair[1](58,92)
+                src_coords = pair[0] #pair[0](128,192)
+                dest_coords = pair[1] #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
                 source = g.get_vertex(source_id)
                 #print("aaaa",source)
@@ -2457,9 +2448,7 @@ def main():
                 #data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
                 #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
                 #data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
-                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
-                
-                break
+                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))            
 
                 if teste:
                     #teste=False
