@@ -2056,7 +2056,7 @@ def main():
     else:
         maps = GenerateVars.maps
         
-    for mp in maps:
+    for mp in maps[:1]:
         i=0
         global map_id
         map_id = mp.id_map
@@ -2075,7 +2075,7 @@ def main():
         viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
         print('Gerando os viewsheds')
     # Quantidade de caminhos para cada observador (100 X 1000)
-        paths_per_map = 5000
+        paths_per_map = 4800
 
         start_time = time()
 
@@ -2218,7 +2218,7 @@ def main():
             combinations = combinations[:paths_per_map]
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
-            for pair in combinations:
+            for pair in combinations[:50]:
                 src_coords = pair[0] #pair[0](128,192)
                 dest_coords = pair[1] #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
@@ -2262,8 +2262,8 @@ def main():
                 #4 casos:
              #   dnn_heuristic_dict1, h_map_time1 = heuristic_dict1_multiplos_mapas(g, model1, dest)
                 #dnn_heuristic_dict2, h_map_time2 = heuristic_dict1_multiplos_mapas(g, model_ABS, dest, mp.id_map)
-                dnn_heuristic_frozen, h_map_frozen = heuristic_dict1_multiplos_mapas_frozen_graph(g, dest, mp.id_map)
-                dnn_heuristic_frozen_cf, h_map_frozen2 = heuristic_dict1_multiplos_mapas_frozen_graph_cf(g, dest, mp.id_map)
+                # dnn_heuristic_frozen, h_map_frozen = heuristic_dict1_multiplos_mapas_frozen_graph(g, dest, mp.id_map)
+                # dnn_heuristic_frozen_cf, h_map_frozen2 = heuristic_dict1_multiplos_mapas_frozen_graph_cf(g, dest, mp.id_map)
                 # dnn_heuristic_iterative, h_map_iterative = heuristic_dict1_multiplos_mapas_iterative(g, model_ABS, source, dest, mp.id_map)
                 dnn_heuristic_iterative = {}
                 dnn_heuristic_iterative_cf = {}
@@ -2573,16 +2573,16 @@ def main():
                 #data_io_comp2.write("""%s;%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2,h_map_time1))
                 data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
                 #data_io_comp2.write("""%s;%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2,h_map_time2))
-                data_io_comp3.write("""%s;%s;%s;%s;%s\n""" %(cost3,t3+h_map_frozen,count_visited3,count_open3,h_map_frozen))
-                data_io_comp4.write("""%s;%s;%s;%s;%s\n""" %(cost4,t4+h_map_frozen2,count_visited4,count_open4,h_map_frozen2))
+                data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+                data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4,count_visited4,count_open4))
                 data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
                 data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
                 #data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
                 #data_io_comp6.write("""%s;%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6,h_map_time1))
                 data_io_comp7.write("""%s;%s;%s;%s\n""" %(cost7,t7,count_visited7,count_open7))
                 #data_io_comp8.write("""%s;%s;%s;%s;%s\n""" %(cost8,t8+h_map_time2,count_visited8,count_open8,h_map_time2))
-                data_io_comp9.write("""%s;%s;%s;%s;%s\n""" %(cost9,t9+h_map_frozen,count_visited9,count_open9,h_map_frozen))
-                data_io_comp10.write("""%s;%s;%s;%s;%s\n""" %(cost10,t10+h_map_frozen2,count_visited10,count_open10,h_map_frozen2))
+                data_io_comp9.write("""%s;%s;%s;%s\n""" %(cost9,t9,count_visited9,count_open9))
+                data_io_comp10.write("""%s;%s;%s;%s\n""" %(cost10,t10,count_visited10,count_open10))
                 data_io_comp11.write("""%s;%s;%s;%s\n""" %(cost11,t11,count_visited11,count_open11))
                 data_io_comp12.write("""%s;%s;%s;%s\n""" %(cost12,t12,count_visited12,count_open12))
                 #data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
