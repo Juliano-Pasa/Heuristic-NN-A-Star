@@ -1219,6 +1219,111 @@ def astar(g, start, goal, v_weight, heuristic):
                     opened.append((next, hscore))
                     #count_open = count_open + 1
                     #opened.append(next.get_coordinates())'''
+                    
+                    
+def ida(g, start, goal, v_weight, heuristic):
+    opened = []
+    visited = []
+
+    visibility_weight = v_weight
+    
+    #print(start)
+    #print(goal)
+
+    # Seta distância inicial para 0 e o risco inicial para o risco do ponto de partida
+    start.set_risk(start.get_local_risk())
+    start.set_distance(0)
+
+    # Calcula custo = w * risco + distancia + heursítica_r3
+    hscore = start.get_distance() + heuristic(start, goal)
+    bound = hscore
+
+    unvisited_queue = [(hscore, start)]
+    heapq.heapify(unvisited_queue)
+
+    count_visited = 0
+    count_open = 1
+
+    threshold = heuristic(start, goal)
+    opened.append(start.get_coordinates())
+    found = False
+    while len(unvisited_queue)>0:
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+        print(len(unvisited_queue))
+        flag, node =search(g,current, goal, unvisited_queue,opened,heuristic,bound,visited,count_visited,threshold)
+        if flag:
+                #print("ÇOCORRO DEUS\n\n\n\n\n",visited)
+                #break
+                distance = current.get_distance()
+                path=[]
+                #print(current)
+                #print(start)
+                #print("VOLTEI KKKKKKKKKKKKKKKKKKK1")
+                path=backtracking(current,start)
+                #print("VOLTEI KKKKKKKKKKKKKKKKKKK2")
+                
+                #closed_nodes = list(map(lambda v: v.get_coordinates(), visited))
+                
+                print("VOLTEI KKKKKKKKKKKKKKKKKKK")
+                return visited, len(path), count_open, path, node.get_distance()
+        else:
+            print("entrei nessa condicao")
+            threshold = node.get_distance()
+    print("fudeo lek kek")
+
+global N_CHAMADAS
+def search(g,current, goal, unvisited_queue, opened, heuristic, bound,visited,count_visited,threshold):
+    global N_CHAMADAS
+    N_CHAMADAS = N_CHAMADAS + 1
+    print(N_CHAMADAS)
+    count_open = 0 ##HENRIQUE VER -> Deveria estar aqui?
+    
+    if len(unvisited_queue)>1:
+        uv = heapq.heappop(unvisited_queue)
+        current = uv[1]
+    
+    if current == goal:
+        #print(current)
+        #print(goal)
+        return True, current
+    for next_id in current.get_neighbors():
+        
+        
+        next = g.get_vertex(next_id)
+        if next == goal:
+            #print(next)
+            #print(goal)
+            return True, next
+        if current.get_distance()>threshold and current.get_distance()<math.inf:
+            print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+            print(next)
+            return False, next
+        current.set_visited(True)
+        count_visited = count_visited + 1
+        visited.append(current.get_coordinates())
+        
+        new_dist = current.get_distance() + current.get_edge_weight(next_id)
+        new_risk = current.get_risk() + next.get_local_risk()
+        if new_dist < next.get_distance():
+            next.set_previous(current)
+            next.set_distance(new_dist)
+            next.set_risk(new_risk)
+        
+            if not next.visited:
+                hscore = new_dist + heuristic(next, goal)
+                heapq.heappush(unvisited_queue, (hscore, next))
+                count_open = count_open + 1
+                opened.append(next.get_coordinates())    
+                
+                if search(g,next, goal, unvisited_queue, opened, heuristic, bound, visited, count_visited, threshold):##HENRIQUE VER -> Ajustei o visited e o countvisited
+                    #print("chegueiaqui")
+                    return True, next
+    
+    return False
+    ##HENRIQUE VER -> Python estorou o máximo de recursão.
+
+            
 
 #Backtrack do BiA*
 def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open, heuristic,g):
