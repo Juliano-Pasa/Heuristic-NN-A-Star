@@ -2056,7 +2056,7 @@ def main():
     else:
         maps = GenerateVars.maps
         
-    for mp in maps[:1]:
+    for mp in maps:
         i=0
         global map_id
         map_id = mp.id_map
@@ -2075,7 +2075,7 @@ def main():
         viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
         print('Gerando os viewsheds')
     # Quantidade de caminhos para cada observador (100 X 1000)
-        paths_per_map = 4800
+        paths_per_map = 5000
 
         start_time = time()
 
@@ -2109,6 +2109,10 @@ def main():
         data_io_comp10 = io.StringIO()
         data_io_comp11 = io.StringIO()
         data_io_comp12 = io.StringIO()
+        data_io_comp13 = io.StringIO()
+        data_io_comp14 = io.StringIO()
+        data_io_comp15 = io.StringIO()
+        data_io_comp16 = io.StringIO()
         data_io_all = io.StringIO()
 
         # cabecalho dos arquivos csv, separador utilizado é o ';'
@@ -2122,19 +2126,23 @@ def main():
     # data_io_visited_cost_dnn1.write("""y;x\n""")
         #data_io_time_cost_dnn2.write("""y;x\n""")
         #data_io_visited_cost_dnn2.write("""y;x\n""")
-        data_io_comp.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp5.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-        data_io_comp6.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-        data_io_comp7.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp8.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp9.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp10.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
-        data_io_comp11.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-        data_io_comp12.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
-        #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
+        # data_io_comp.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp5.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp6.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp7.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp8.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp9.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp10.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp11.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp12.write("""custo;tempo;nodos_visitados;nodos_abertos\n""")
+        # data_io_comp13.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        # data_io_comp14.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        # data_io_comp15.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        # data_io_comp16.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        # #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
         #data_io_all.write("""ox;oy;oh;x1;y1;h1;x2;y2;h2;c;d;v;nodos_visitados;total_time;time_search;time_h_map\n""")
 
@@ -2148,12 +2156,16 @@ def main():
     # write_dataset_csv('./DADOS_RESULTADOS/time_cost_dnn2.csv', data_io_time_cost_dnn2)
     # write_dataset_csv('./DADOS_RESULTADOS/visited_cost_dnn2.csv', data_io_visited_cost_dnn2)
         write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN_ABS'+str(mp.id_map)+'.csv', data_io_comp13)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN_CF'+str(mp.id_map)+'.csv', data_io_comp14)
         #write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp2)
         write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp3)
         write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp4)
         write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_ABS'+str(mp.id_map)+'.csv', data_io_comp5)
         write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_CF'+str(mp.id_map)+'.csv', data_io_comp6)
         write_dataset_csv('./DADOS_RESULTADOS/BIA_star'+str(mp.id_map)+'.csv', data_io_comp7)
+        write_dataset_csv('./DADOS_RESULTADOS/BIA_star_DNN_ABS'+str(mp.id_map)+'.csv', data_io_comp15)
+        write_dataset_csv('./DADOS_RESULTADOS/BIA_star_DNN_CF'+str(mp.id_map)+'.csv', data_io_comp16)
         #write_dataset_csv('./DADOS_RESULTADOS/BIA_star'+str(mp.id_map)+'.csv', data_io_comp8)
         write_dataset_csv('./DADOS_RESULTADOS/BIA_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp9)
         write_dataset_csv('./DADOS_RESULTADOS/BIA_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp10)
@@ -2186,6 +2198,10 @@ def main():
             data_io_comp10 = io.StringIO()
             data_io_comp11 = io.StringIO()
             data_io_comp12 = io.StringIO()
+            data_io_comp13 = io.StringIO()
+            data_io_comp14 = io.StringIO()
+            data_io_comp15 = io.StringIO()
+            data_io_comp16 = io.StringIO()
             data_io_all = io.StringIO()
 
             b = 0.5  # Fator de importância da segurança no cálculo do custo
@@ -2218,7 +2234,7 @@ def main():
             combinations = combinations[:paths_per_map]
             # ----------------------------------------------------------- #
             # Itera nos N pares de origem e destino
-            for pair in combinations[:50]:
+            for pair in combinations:
                 src_coords = pair[0] #pair[0](128,192)
                 dest_coords = pair[1] #pair[1](58,92)
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
@@ -2274,27 +2290,41 @@ def main():
                 #1) A* simples, heurística r3
                 #1) A* simples, heurística r3
                 
-                '''print("\nA* com heurística")
-                b=0
-                heuristic = dict_dnn_heuristic2
-                t1 = time()
-                opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t1 = time() - t1
-                path1 = [dest.get_id()]
-                print("custo do a* mapa heuristico: ",cost1)
-                print("nodos visitados: ",count_visited1)
-                print("nodos abertos: ",count_open1)
-                count_visible1 = count_visible_nodes(dest, path1, 0)
-                path_len1 = len(path1)
-                print("tempo de duração: ", t1)'''
-                #g.reset()
+                #print("\nA* com heurística")
+                '''b=0
+                heuristic = dict_dnn_heuristic_abs_d
+                t13 = time()
+                opened13, count_visited13, count_open13, visited13, cost13 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t13 = time() - t13'''
+                '''path13 = [dest.get_id()]
+                print("custo do a* mapa heuristico: ",cost13)
+                print("nodos visitados: ",count_visited13)
+                print("nodos abertos: ",count_open13)
+                count_visible13 = count_visible_nodes(dest, path13, 0)
+                path_len13 = len(path13)
+                print("tempo de duração: ", t13)'''
+                g.reset()
+                
+                '''b=0
+                heuristic = dict_dnn_heuristic_cf_d
+                t14 = time()
+                opened14, count_visited14, count_open14, visited14, cost14 = astar_correction_factor(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t14 = time() - t14'''
+                '''path14 = [dest.get_id()]
+                print("custo do a* mapa heuristico CF: ",cost14)
+                print("nodos visitados: ",count_visited14)
+                print("nodos abertos: ",count_open14)
+                count_visible14 = count_visible_nodes(dest, path14, 0)
+                path_len14 = len(path14)
+                print("tempo de duração: ", t14)'''
+                g.reset()
 
                 #print("")
 
-                heuristic = consult_frozen_graph_abs
+                '''heuristic = consult_frozen_graph_abs
                 t3 = time()
                 opened3, count_visited3, count_open3, visited3, cost3 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t3 = time() - t3
+                t3 = time() - t3'''
                 '''path3 = [dest.get_id()]
                 print("custo do a* frozen graph: ",cost3)
                 print("nodos visitados: ",count_visited3)
@@ -2304,10 +2334,10 @@ def main():
                 # print("tempo de duração: ", t3)
                 g.reset()
                 
-                heuristic = consult_frozen_graph_cf
+                '''heuristic = consult_frozen_graph_cf
                 t4 = time()
                 opened4, count_visited4, count_open4, visited4, cost4 = astar_correction_factor(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t4 = time() - t4
+                t4 = time() - t4'''
                 '''path4 = [dest.get_id()]
                 print("custo do a* frozen graph CF: ",cost4)
                 print("nodos visitados: ",count_visited4)
@@ -2453,7 +2483,38 @@ def main():
                 print("tempo do mapeamente heurístico: ", tempo_aaaa)
                 print("Terminou A* topo\n")
                 g.reset()'''
+                
+                
+                '''b=0
+                heuristic = dict_dnn_heuristic_abs_d
+                t15 = time()
+                opened15, count_visited15, count_open15, visited15, cost15 = biastar(g, source, dest, b, heuristic,heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t15 = time() - t15'''
+                '''path15 = [dest.get_id()]
+                print("custo do a* mapa heuristico: ",cost15)
+                print("nodos visitados: ",count_visited15)
+                print("nodos abertos: ",count_open15)
+                count_visible15 = count_visible_nodes(dest, path15, 0)
+                path_len15 = len(path15)
+                print("tempo de duração: ", t15)'''
                 g.reset()
+                
+                ''''b=0
+                heuristic = dict_dnn_heuristic_cf_d
+                t16 = time()
+                opened16, count_visited16, count_open16, visited16, cost16 = biastar_DNN_CF(g, source, dest, b, heuristic, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+                t16 = time() - t16'''
+                '''path16 = [dest.get_id()]
+                print("custo do a* mapa heuristico CF: ",cost16)
+                print("nodos visitados: ",count_visited16)
+                print("nodos abertos: ",count_open16)
+                count_visible16 = count_visible_nodes(dest, path16, 0)
+                path_len16 = len(path16)
+                print("tempo de duração: ", t16)'''
+                g.reset()
+                
+                
+                
                 dnn_heuristic_iterative = {}
                 dnn_heuristic_iterative_cf = {}
                 
@@ -2494,10 +2555,10 @@ def main():
                 # print("Terminou A* topo\n")
                 g.reset()
                 
-                heuristic = consult_frozen_graph_abs
+                '''heuristic = consult_frozen_graph_abs
                 t9 = time()
                 opened9, count_visited9, count_open9, visited9, cost9 = biastar(g, source, dest, b, heuristic,heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t9 = time() - t9
+                t9 = time() - t9'''
                 '''path9 = [dest.get_id()]
                 print("custo do bia* frozen graph: ",cost9)
                 print("nodos visitados: ",count_visited9)
@@ -2507,10 +2568,10 @@ def main():
                 # print("tempo de duração: ", t9)
                 g.reset()
                 
-                heuristic = consult_frozen_graph_cf
+                '''heuristic = consult_frozen_graph_cf
                 t10 = time()
                 opened10, count_visited10, count_open10, visited10, cost10 = biastar_DNN_CF(g, source, dest, b, heuristic,heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
-                t10 = time() - t10
+                t10 = time() - t10'''
                 '''path10 = [dest.get_id()]
                 print("custo do bia* frozen graph CF: ",cost10)
                 print("nodos visitados: ",count_visited10)
@@ -2573,18 +2634,22 @@ def main():
                 #data_io_comp2.write("""%s;%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2,h_map_time1))
                 data_io_comp.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
                 #data_io_comp2.write("""%s;%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2,h_map_time2))
-                data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
-                data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4,count_visited4,count_open4))
+                #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+                #data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4,count_visited4,count_open4))
                 data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
                 data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
                 #data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
                 #data_io_comp6.write("""%s;%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6,h_map_time1))
                 data_io_comp7.write("""%s;%s;%s;%s\n""" %(cost7,t7,count_visited7,count_open7))
                 #data_io_comp8.write("""%s;%s;%s;%s;%s\n""" %(cost8,t8+h_map_time2,count_visited8,count_open8,h_map_time2))
-                data_io_comp9.write("""%s;%s;%s;%s\n""" %(cost9,t9,count_visited9,count_open9))
-                data_io_comp10.write("""%s;%s;%s;%s\n""" %(cost10,t10,count_visited10,count_open10))
+                #data_io_comp9.write("""%s;%s;%s;%s\n""" %(cost9,t9,count_visited9,count_open9))
+                #data_io_comp10.write("""%s;%s;%s;%s\n""" %(cost10,t10,count_visited10,count_open10))
                 data_io_comp11.write("""%s;%s;%s;%s\n""" %(cost11,t11,count_visited11,count_open11))
                 data_io_comp12.write("""%s;%s;%s;%s\n""" %(cost12,t12,count_visited12,count_open12))
+                #data_io_comp13.write("""%s;%s;%s;%s;%s\n""" %(cost13,t13+h_map_time2,count_visited13,count_open13,h_map_time2))
+                #data_io_comp14.write("""%s;%s;%s;%s;%s\n""" %(cost14,t14+h_map_time1,count_visited14,count_open14,h_map_time1))
+                #data_io_comp15.write("""%s;%s;%s;%s;%s\n""" %(cost15,t15+h_map_time2,count_visited15,count_open15,h_map_time2))
+                #data_io_comp16.write("""%s;%s;%s;%s;%s\n""" %(cost16,t16+h_map_time1,count_visited16,count_open16,h_map_time1))
                 #data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2+h_map_time2,count_visited2,count_open2))
                 #data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
                 #data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4+h_map_time1,count_visited4,count_open4))
@@ -2645,12 +2710,16 @@ def main():
             #write_dataset_csv('./DADOS_RESULTADOS/Theta_star.csv', data_io_comp3)
             #write_dataset_csv('./DADOS_RESULTADOS/A_star_dnn_CF'+str(mp.id_map)+'.csv', data_io_comp4)
             write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp)
+            write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN_ABS'+str(mp.id_map)+'.csv', data_io_comp13)
+            write_dataset_csv('./DADOS_RESULTADOS/A_star_DNN_CF'+str(mp.id_map)+'.csv', data_io_comp14)
             #write_dataset_csv('./DADOS_RESULTADOS/A_star'+str(mp.id_map)+'.csv', data_io_comp2)
             write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp3)
             write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp4)
             write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_ABS'+str(mp.id_map)+'.csv', data_io_comp5)
             write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_CF'+str(mp.id_map)+'.csv', data_io_comp6)
             write_dataset_csv('./DADOS_RESULTADOS/BIA_star'+str(mp.id_map)+'.csv', data_io_comp7)
+            write_dataset_csv('./DADOS_RESULTADOS/BIA_star_DNN_ABS'+str(mp.id_map)+'.csv', data_io_comp15)
+            write_dataset_csv('./DADOS_RESULTADOS/BIA_star_DNN_CF'+str(mp.id_map)+'.csv', data_io_comp16)
             #write_dataset_csv('./DADOS_RESULTADOS/BIA_star'+str(mp.id_map)+'.csv', data_io_comp8)
             write_dataset_csv('./DADOS_RESULTADOS/BIA_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp9)
             write_dataset_csv('./DADOS_RESULTADOS/BIA_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp10)
