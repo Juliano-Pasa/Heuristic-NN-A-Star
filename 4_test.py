@@ -1853,32 +1853,6 @@ def heuristic_dict1_multiplos_mapas_frozen_graph(g, goal, map_id):
 
     return dict_heuristica, t1_stop - t1_start
 
-def heuristic_dict1_multiplos_mapas_frozen_graph_cf(g, goal, map_id):
-    todos_vertices = g.get_vertices()
-    vertice_y = goal
-    (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
-
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
-    for vertice_x in g:
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
-
-        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
-
-    # Monta um dicionário com as predições da DNN
-    dataset = np.array(dataset)
-    result = session_cf.run(output_tensor_cf, {'x:0': dataset})
-    #with tf.device('/gpu:0'):
-    dict_heuristica = dict(zip(todos_vertices, result))
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
 
 def heuristic_dict2_observadores(g, model, goal,vp):
     todos_vertices = g.get_vertices()
@@ -1974,9 +1948,6 @@ def dict_dnn_heuristic2(start, goal):
     predicao = dnn_heuristic_dict2[start.get_id()][0]
     return predicao
 
-def dict_frozen_graph(start, goal):
-    return dnn_heuristic_frozen[start.get_id()][0]
-
 def dict_dnn_iterative_abs(start, goal):
     value = 0
     global dnn_heuristic_iterative
@@ -1988,20 +1959,6 @@ def dict_dnn_iterative_abs(start, goal):
         aux, _ = heuristic_dict1_multiplos_mapas_iterative(g, session_abs, output_tensor_abs, start, goal, mapId)
         dnn_heuristic_iterative.update(aux)
         value = dnn_heuristic_iterative[start.get_id()][0]
-
-    return value
-
-def dict_dnn_iterative_cf(start, goal):
-    value = 0
-    global dnn_heuristic_iterative_cf
-
-    try:
-        value = dnn_heuristic_iterative_cf[start.get_id()][0]
-
-    except KeyError:
-        aux, _ = heuristic_dict1_multiplos_mapas_iterative(g, session_cf, output_tensor_cf, start, goal, mapId)
-        dnn_heuristic_iterative_cf.update(aux)
-        value = dnn_heuristic_iterative_cf[start.get_id()][0]
 
     return value
 
@@ -2045,26 +2002,6 @@ def consult_frozen_graph_abs(start, goal):
 
     data = np.array([data, data])
     return session_abs.run(output_tensor_abs, {'x:0': data})[0][0]
-
-def consult_frozen_graph_cf(start, goal):
-    (x1, y1, alt1) = start.get_r3_coordinates()
-    (x2, y2, alt2) = goal.get_r3_coordinates()
-
-    if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [map_id, x2, y2, alt2, x1, y1, alt1]
-    else:
-        data = [map_id, x1, y1, alt1, x2, y2, alt2]
-
-    data = np.array([data, data])
-    return session_cf.run(output_tensor_cf, {'x:0': data})[0][0]
-
-def dict_dnn_heuristic_abs_d(start, goal):
-    predicao = dnn_heuristic_dict2_ABS_D[start.get_id()][0]
-    return predicao
-
-def dict_dnn_heuristic_cf_d(start, goal):
-    predicao = dnn_heuristic_dict_CF_D[start.get_id()][0]
-    return predicao
 
 def observer_points(grid, n, m, r=10, spacing=4):  #divide o grid(n x m) em r x r regioes
     nr = (n)/r
