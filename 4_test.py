@@ -931,7 +931,9 @@ def main():
     else:
         maps = GenerateVars.maps
         
-    for mp in maps:
+    # for mp in maps[:1]:
+    for iteration in range(100):
+        mp = maps[0]
         i=0
         global map_id
         map_id = mp.id_map
@@ -949,7 +951,7 @@ def main():
         g = Graph(mde)
         print('Gerando os viewsheds')
 
-        paths_per_map = 10_000
+        paths_per_map = 10000
 
         start_time = time()
         data_io_comp1 = io.StringIO()
@@ -1002,9 +1004,9 @@ def main():
 
             g.reset()
 
-        write_dataset_csv('./DADOS_RESULTADOS/binaryClusters'+str(mp.id_map)+'.csv', data_io_comp1)
-        write_dataset_csv('./DADOS_RESULTADOS/sumOfClusters'+str(mp.id_map)+'.csv', data_io_comp2)
-        write_dataset_csv('./DADOS_RESULTADOS/clusterClustering'+str(mp.id_map)+'.csv', data_io_comp3)
+        write_dataset_csv('./DADOS_RESULTADOS/binaryClustersC'+str(iteration)+'.csv', data_io_comp1)
+        write_dataset_csv('./DADOS_RESULTADOS/sumOfClustersC'+str(iteration)+'.csv', data_io_comp2)
+        write_dataset_csv('./DADOS_RESULTADOS/clusterClusteringC'+str(iteration)+'.csv', data_io_comp3)
 
         print('Tempo: ' + str(time() - start_time) + ' segundos')
 
