@@ -1503,35 +1503,6 @@ def generate_sample_points(sampling_percentage):
     return P
 
 
-
-def heuristic_dict1_multiplos_mapas(g, model, goal, map_id):
-    todos_vertices = g.get_vertices()
-    vertice_y = goal
-    (x2, y2, alt2) = vertice_y.get_r3_coordinates() 
-
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-    for vertice_x in g:
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    
-    predicoes = model.predict(dataset, batch_size=32*1024)
-
-    dict_heuristica = dict(zip(todos_vertices, predicoes))
-
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
 def heuristic_dict1_multiplos_mapas_iterative(g, session, output_tensor, current, goal, map_id):
     dataset = []
     t1_start = time()
@@ -1583,155 +1554,6 @@ def heuristic_dict1_multiplos_mapas_iterative(g, session, output_tensor, current
 
     return dict_heuristica, t1_stop - t1_start
 
-def heuristic_dict1_multiplos_mapas_frozen_graph(g, goal, map_id):
-    todos_vertices = g.get_vertices()
-    vertice_y = goal
-    (x2, y2, alt2) = vertice_y.get_r3_coordinates() 
-
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-    for vertice_x in g:
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    result = session_abs.run(output_tensor_abs, {'x:0': dataset})
-    
-    dict_heuristica = dict(zip(todos_vertices, result))
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-def heuristic_dict1_multiplos_mapas_frozen_graph_cf(g, goal, map_id):
-    todos_vertices = g.get_vertices()
-    vertice_y = goal
-    (x2, y2, alt2) = vertice_y.get_r3_coordinates() 
-
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-    for vertice_x in g:
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    result = session_cf.run(output_tensor_cf, {'x:0': dataset})
-    
-    dict_heuristica = dict(zip(todos_vertices, result))
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-
-def heuristic_dict2_observadores(g, model, goal,vp):
-    todos_vertices = g.get_vertices()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-    for vertice_x in g:
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([vp, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([vp, x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    with tf.device('/gpu:0'):
-        predicoes = model.predict_on_batch(dataset)
-
-    dict_heuristica = dict(zip(todos_vertices, predicoes))
-
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-def heuristic_dict1(g, model, goal):
-    todos_vertices = g.get_vertices()
-
-    dataset = []
-    t1_start = time()
-    for vertice_x in g:
-        vertice_y = goal
-
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([ x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([ x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    with tf.device('/gpu:0'):
-        predicoes = model.predict_on_batch(dataset)
-
-    dict_heuristica = dict(zip(todos_vertices, predicoes))
-
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-
-
-def heuristic_dict2(g, model, observer, goal):
-    todos_vertices = g.get_vertices()
-
-    dataset = []
-    t1_start = time()
-    for vertice_x in g:
-        vertice_y = goal
-
-        (x1, y1, alt1) = vertice_x.get_r3_coordinates() 
-        (x2, y2, alt2) = vertice_y.get_r3_coordinates() 
-
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([observer[0], observer[1], observer[2], x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([observer[0], observer[1], observer[2], x1, y1, alt1, x2, y2, alt2])
-
-    
-    dataset = np.array(dataset)
-    with tf.device('/gpu:0'):
-        predicoes = model.predict_on_batch(dataset)
-
-    dict_heuristica = dict(zip(todos_vertices, predicoes))
-
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-def dict_dnn_heuristic1(start, goal):
-    predicao = dnn_heuristic_dict1[start.get_id()][0]
-    return predicao
-
-
-def dict_dnn_heuristic2(start, goal):
-    predicao = dnn_heuristic_dict2[start.get_id()][0]
-    return predicao
-
-def dict_frozen_graph(start, goal):
-    return dnn_heuristic_frozen[start.get_id()][0]
 
 def dict_dnn_iterative_abs(start, goal):
     value = 0
@@ -1760,67 +1582,6 @@ def dict_dnn_iterative_cf(start, goal):
         value = dnn_heuristic_iterative_cf[start.get_id()][0]
 
     return value
-
-def dnn_predict_test(start, goal):
-    global model_test
-    (x1, y1, alt1) = start.get_r3_coordinates()  
-    (x2, y2, alt2) = goal.get_r3_coordinates()  
-    id_map = 1 
-    
-    if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [id_map, x2, y2, alt2, x1, y1, alt1]
-    else:
-        data = [id_map, x1, y1, alt1, x2, y2, alt2]
-        
-    
-    with tf.device('/gpu:0'):
-        val = model_test.predict(np.array([data]), batch_size=1)
-        
-        
-    return val
-
-def dnn_predict(start, goal, model, observer):
-    (x1, y1, alt1) = start.get_r3_coordinates()  
-    (x2, y2, alt2) = goal.get_r3_coordinates()  
-
-    
-    if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [observer[0], observer[1], observer[2], x2, y2, alt2, x1, y1, alt1]
-    else:
-        data = [observer[0], observer[1], observer[2], x1, y1, alt1, x2, y2, alt2]
-    return model.predict(np.array([data]))
-
-def consult_frozen_graph_abs(start, goal):
-    (x1, y1, alt1) = start.get_r3_coordinates()
-    (x2, y2, alt2) = goal.get_r3_coordinates()
-
-    if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [map_id, x2, y2, alt2, x1, y1, alt1]
-    else:
-        data = [map_id, x1, y1, alt1, x2, y2, alt2]
-
-    data = np.array([data, data])
-    return session_abs.run(output_tensor_abs, {'x:0': data})[0][0]
-
-def consult_frozen_graph_cf(start, goal):
-    (x1, y1, alt1) = start.get_r3_coordinates()
-    (x2, y2, alt2) = goal.get_r3_coordinates()
-
-    if x2 < x1 or (x2 == x1 and y2 < y1):
-        data = [map_id, x2, y2, alt2, x1, y1, alt1]
-    else:
-        data = [map_id, x1, y1, alt1, x2, y2, alt2]
-
-    data = np.array([data, data])
-    return session_cf.run(output_tensor_cf, {'x:0': data})[0][0]
-
-def dict_dnn_heuristic_abs_d(start, goal):
-    predicao = dnn_heuristic_dict2_ABS_D[start.get_id()][0]
-    return predicao
-
-def dict_dnn_heuristic_cf_d(start, goal):
-    predicao = dnn_heuristic_dict_CF_D[start.get_id()][0]
-    return predicao
 
 def observer_points(grid, n, m, r=10, spacing=4):  
     nr = (n)/r
@@ -1856,10 +1617,6 @@ def count_visible_nodes(v, path, count_visible):
 def main():
     args = sys.argv
     
-    '''model_1_10.hdf5''' 
-    model_name1 = 'model_32_20230227-164136_checkpoint_19_0.0147.hdf5'
-    model_name2 = 'model_32_20230220-165452_checkpoint_94_0.2484.hdf5' 
-
     global session_abs
     global output_tensor_abs
 
@@ -1877,7 +1634,7 @@ def main():
     global session_cf
     global output_tensor_cf
 
-    session_cf = tf1.InteractiveSession()
+    '''session_cf = tf1.InteractiveSession()
     frozen_graph_cf="./frozen_models/frozen_graph_cf.pb"
 
     with tf1.gfile.GFile(frozen_graph_cf, "rb") as f:
@@ -1886,12 +1643,8 @@ def main():
 
     session_cf.graph.as_default()
     tf1.import_graph_def(graph_def)    
-    output_tensor_cf = session_cf.graph.get_tensor_by_name("Identity:0")
+    output_tensor_cf = session_cf.graph.get_tensor_by_name("Identity:0")'''
     
-    reduction_factor = 1 
-    
-    model_CF = load_model(model_name1)
-    model_ABS = load_model(model_name2)
     global g
     global mapId
 
@@ -1982,14 +1735,14 @@ def main():
 
             
 
-            heuristic = dict_dnn_iterative_cf
+            '''heuristic = dict_dnn_iterative_cf
             t6 = time()
             opened6, count_visited6, count_open6, visited6, cost6 = astar_correction_factor(g, source, dest, b, heuristic) 
             t6 = time() - t6
             g.reset()
 
             data_io_comp5.write("""%s;%s;%s;%s\n""" %(cost5,t5,count_visited5,count_open5))
-            data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
+            data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))'''
 
             i+=1
             print(i)
