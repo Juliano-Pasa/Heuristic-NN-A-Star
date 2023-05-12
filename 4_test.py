@@ -638,7 +638,7 @@ def calculateClusterId(current):
     row = i // clusterDivisor
     col = j // clusterDivisor
 
-    return row * 6 + col
+    return row * 12 + col
 
 def astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -909,7 +909,7 @@ def main():
     global visitedClusters
     global clusterDivisor
 
-    clusterDivisions = 6
+    clusterDivisions = 12
     clusterDivisor = 300 / clusterDivisions
     visitedClusters = ResetDictionary(clusterDivisions**2)
 
@@ -933,82 +933,75 @@ def main():
         
     # for mp in maps[:1]:
     for iteration in range(100):
-        mp = maps[0]
-        i=0
-        global map_id
-        map_id = mp.id_map
-        if(GenerateVars.use_viewpoints):
-            map_dir = GenerateVars.vps_map_dir
-        else:
-            map_dir = GenerateVars.maps_dir
-        
-        mapId = mp.id_map
-        map_path = map_dir + mp.filename
-        print('Criando o grafo')
-        mde = Mde(map_path, mp.reduction_factor)
-        print(mp.filename)
-        print(mp.id_map)
-        g = Graph(mde)
-        print('Gerando os viewsheds')
-
-        paths_per_map = 10000
-
-        start_time = time()
-        data_io_comp1 = io.StringIO()
-        data_io_comp2 = io.StringIO()
-        data_io_comp3 = io.StringIO()
-        
-        data_io_comp1.write("""x0,y0,x1,y1,mapId%s\n""" %(generateClusterHeader(clusterDivisions*clusterDivisions)))
-        data_io_comp2.write("""x0,y0,x1,y1,mapId,c\n""")
-        data_io_comp3.write("""x0,y0,x1,y1,mapId,c0,c1,c2,c3\n""")
-
-        if not os.path.exists("./DADOS_RESULTADOS/"):
-            os.makedirs("./DADOS_RESULTADOS/")
-
-        b = 0.5              
-
-        sampling_rate = 0.125
-        sample_coords = generate_sample_points(sampling_rate / 100)
-
-        aux = 0
-        combinations = []
-        for coords in sample_coords:
-            for coords2 in sample_coords[aux+1:]:
-                combinations.append([coords, coords2])
-            aux += 1
-
-        random.shuffle(combinations)
-        combinations = combinations[:paths_per_map]
-        for pair in combinations:
-            src_coords = pair[0] 
-            dest_coords = pair[1] 
-            source_id = get_id_by_coords(src_coords[0], src_coords[1]) 
-            source = g.get_vertex(source_id)
-            dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
-            dest = g.get_vertex(dest_id)
+        for mp in maps:
+            i=0
+            global map_id
+            map_id = mp.id_map
+            if(GenerateVars.use_viewpoints):
+                map_dir = GenerateVars.vps_map_dir
+            else:
+                map_dir = GenerateVars.maps_dir
             
-            global dnn_heuristic_iterative
-            dnn_heuristic_iterative = {}
+            mapId = mp.id_map
+            map_path = map_dir + mp.filename
+            print('Criando o grafo')
+            mde = Mde(map_path, mp.reduction_factor)
+            print(mp.filename)
+            print(mp.id_map)
+            g = Graph(mde)
+            print('Gerando os viewsheds')
 
-            heuristic = dict_dnn_iterative_abs
-            t = time()
-            opened, count_visited, count_open, visited, cost = astar(g, source, dest, b, heuristic) 
-            t = time() - t
+            paths_per_map = 150
 
-            data_io_comp1.write("""%s,%s,%s,%s,%s%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeAllClusters()))
-            data_io_comp2.write("""%s,%s,%s,%s,%s,%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeSumOfClusters()))
-            data_io_comp3.write("""%s,%s,%s,%s,%s%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeClusterClustering()))
-            i+=1
+            start_time = time()
+            data_io_comp1 = io.StringIO()
+            
+            data_io_comp1.write("""x0,y0,x1,y1,mapId%s\n""" %(generateClusterHeader(clusterDivisions*clusterDivisions)))
 
-            visitedClusters = ResetDictionary(clusterDivisions**2)
+            if not os.path.exists("./DADOS_RESULTADOS/"):
+                os.makedirs("./DADOS_RESULTADOS/")
 
-            g.reset()
+            b = 0.5              
 
-        write_dataset_csv('./DADOS_RESULTADOS/binaryClustersC'+str(iteration)+'.csv', data_io_comp1)
-        write_dataset_csv('./DADOS_RESULTADOS/sumOfClustersC'+str(iteration)+'.csv', data_io_comp2)
-        write_dataset_csv('./DADOS_RESULTADOS/clusterClusteringC'+str(iteration)+'.csv', data_io_comp3)
+            sampling_rate = 0.125
+            sample_coords = generate_sample_points(sampling_rate / 100)
 
-        print('Tempo: ' + str(time() - start_time) + ' segundos')
+            aux = 0
+            combinations = []
+            for coords in sample_coords:
+                for coords2 in sample_coords[aux+1:]:
+                    combinations.append([coords, coords2])
+                aux += 1
+
+            random.shuffle(combinations)
+            combinations = combinations[:paths_per_map]
+            for pair in combinations:
+                src_coords = pair[0] 
+                dest_coords = pair[1] 
+                source_id = get_id_by_coords(src_coords[0], src_coords[1]) 
+                source = g.get_vertex(source_id)
+                dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
+                dest = g.get_vertex(dest_id)
+                
+                global dnn_heuristic_iterative
+                dnn_heuristic_iterative = {}
+
+                heuristic = dict_dnn_iterative_abs
+                t = time()
+                opened, count_visited, count_open, visited, cost = astar(g, source, dest, b, heuristic) 
+                t = time() - t
+
+                data_io_comp1.write("""%s,%s,%s,%s,%s%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeAllClusters()))
+                i+=1
+
+                visitedClusters = ResetDictionary(clusterDivisions**2)
+
+                g.reset()
+
+
+            write_dataset_csv('./DADOS_RESULTADOS/binaryClusters'+str(iteration)+'.csv', data_io_comp1)
+
+            print('Tempo: ' + str(time() - start_time) + ' segundos')
 
 if __name__ == '__main__':
     main()
