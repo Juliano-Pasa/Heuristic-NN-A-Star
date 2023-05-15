@@ -35,37 +35,6 @@ def model_l():
     model.compile(optimizer=optimizer,loss=losses.MAPE,metrics=[metrics.MAPE])
     return model
 
-def model_mo():
-    initializer = HeNormal()
-    optimizer = Adam(learning_rate=0.0001)
-
-    inputLayer = Input(shape=(5,))
-    firstDensec0 = Dense(200,activation='relu', kernel_initializer=initializer)(inputLayer)
-    firstDensec1 = Dense(200,activation='relu', kernel_initializer=initializer)(inputLayer)
-    firstDensec2 = Dense(200,activation='relu', kernel_initializer=initializer)(inputLayer)
-    firstDensec3 = Dense(200,activation='relu', kernel_initializer=initializer)(inputLayer)
-
-    secondDensec0 = Dense(300,activation='relu', kernel_initializer=initializer)(firstDensec0)
-    secondDensec1 = Dense(300,activation='relu', kernel_initializer=initializer)(firstDensec1)
-    secondDensec2 = Dense(300,activation='relu', kernel_initializer=initializer)(firstDensec2)
-    secondDensec3 = Dense(300,activation='relu', kernel_initializer=initializer)(firstDensec3)
-
-    thirdDensec0 = Dense(200,activation='relu', kernel_initializer=initializer)(secondDensec0)
-    thirdDensec1 = Dense(200,activation='relu', kernel_initializer=initializer)(secondDensec1)
-    thirdDensec2 = Dense(200,activation='relu', kernel_initializer=initializer)(secondDensec2)
-    thirdDensec3 = Dense(200,activation='relu', kernel_initializer=initializer)(secondDensec3)
-
-    c0Output = Dense(1,activation='linear', name='c0')(thirdDensec0)
-    c1Output = Dense(1,activation='linear', name='c1')(thirdDensec1)
-    c2Output = Dense(1,activation='linear', name='c2')(thirdDensec2)
-    c3Output = Dense(1,activation='linear', name='c3')(thirdDensec3)
-
-    model = tf.keras.Model(inputs=inputLayer, outputs=[c0Output, c1Output, c2Output, c3Output])
-    model.compile(optimizer=optimizer, 
-                  loss={'c0': losses.MAPE, 'c1': losses.MAPE, 'c2': losses.MAPE, 'c3': losses.MAPE},
-                  metrics={'c0': metrics.MAPE, 'c1': metrics.MAPE, 'c2': metrics.MAPE, 'c3': metrics.MAPE})
-    
-    return model
 
 def model_b():
     initializer = HeNormal()
@@ -150,7 +119,7 @@ def train_dnn(model, n_batch, dataset, n_epochs_max=2000, patience=100, dir_log=
     sampling = 0.10     # amostragem por instância do mapa
     num_maps = 1      # quantidade de instâncias
     # dataset_size = ((map_size * sampling) * (map_size * sampling -1) * num_maps) / 2
-    dataset_size = 166176
+    dataset_size = 167800
 
     # Quantidade de 'leituras' realizadas para passar pelo arquivo inteiro (1 por lote)
     ntrain = (dataset_size * 0.7) // n_batch
@@ -175,17 +144,6 @@ def train_dnn(model, n_batch, dataset, n_epochs_max=2000, patience=100, dir_log=
 
     score = model.evaluate(test_generator, steps=ntest, verbose=1)
 
-    csvfile = open(test_set)
-    reader = pd.read_csv(csvfile, nrows=10, header=None, dtype="float64")
-
-    for row in reader:
-        print(row)
-
-    results = model.predict(row[:5])
-
-    for result in results:
-        print(result)
-
     return score, history
 
 
@@ -200,7 +158,7 @@ def main():
     args = sys.argv
 
     out_dir = "D:\Juliano Pasa\Pesquisa\codigo-do-cristian-theta-\\results"
-    dataset_location = "D:\Juliano Pasa\Pesquisa\codigo-do-cristian-theta-\dataset\\binarioMaior"
+    dataset_location = "D:\Juliano Pasa\Pesquisa\codigo-do-cristian-theta-\dataset\\binario25"
 
     data_io_stats = io.StringIO()
     stats_file_name = out_dir + '/results.csv'
