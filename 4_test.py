@@ -1515,21 +1515,19 @@ def heuristic_dict1_multiplos_mapas_iterative(g, session, output_tensor, current
 
     global expanding_factor
 
-    for i in range(-expanding_factor, expanding_factor+1):
-        ids.append((current_i + i) * GRID_COLS + current_j)
-        for j in range(1, expanding_factor+1):
-            ids.append((current_i + i) * GRID_COLS + (current_j + j))
-            ids.append((current_i + i) * GRID_COLS + (current_j - j))
+    for i in range(-expanding_factor + 1, expanding_factor + 1):
+        for j in range(expanding_factor):
+            aux = (current_i + i) * GRID_COLS
+            ids.append(aux + current_j + j + 1)
+            ids.append(aux + current_j - j)
 
     maximum = GRID_COLS * GRID_ROWS
 
     for id in ids:
-        if id < 0 or id > maximum:
+        if id < 0 or id >= maximum:
             continue
 
-        vertex = g.get_vertex(id)
-        if vertex is None:
-            continue
+        vertex = g.get_vertex(id)        
         if vertex.computed:
             continue
 
@@ -1667,11 +1665,9 @@ def main():
     else:
         maps = GenerateVars.maps
 
-    expandingFactors = [7, 12, 17, 24, 29]
+    expandingFactors = [4, 8, 16, 32, 64]
 
-    for factor in expandingFactors:
-        expanding_factor = factor
-
+    for iteration in range(5):
         for mp in maps:
             i=0
             global map_id
@@ -1691,7 +1687,7 @@ def main():
             viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
             print('Gerando os viewsheds')
         
-            paths_per_map = 10000
+            paths_per_map = 10_000
 
             start_time = time()
             data_io_comp5 = io.StringIO()
@@ -1739,36 +1735,39 @@ def main():
                 
                 global dnn_heuristic_iterative
                 global dnn_heuristic_iterative_cf
+
+                for factor in expandingFactors:
+                    expanding_factor = factor
                 
-                dnn_heuristic_iterative = {}
-                dnn_heuristic_iterative_cf = {}
+                    dnn_heuristic_iterative = {}
+                    dnn_heuristic_iterative_cf = {}
 
-                heuristic = dict_dnn_iterative_abs
-                t5 = time()
-                opened5, count_visited5, count_open5, visited5, cost5 = astar(g, source, dest, b, heuristic) 
-                t5 = time() - t5
-                g.reset()
+                    heuristic = dict_dnn_iterative_abs
+                    t5 = time()
+                    opened5, count_visited5, count_open5, visited5, cost5 = astar(g, source, dest, b, heuristic) 
+                    t5 = time() - t5
+                    g.reset()
 
-                
+                    
 
-                '''heuristic = dict_dnn_iterative_cf
-                t6 = time()
-                opened6, count_visited6, count_open6, visited6, cost6 = astar_correction_factor(g, source, dest, b, heuristic) 
-                t6 = time() - t6
-                g.reset()'''
+                    '''heuristic = dict_dnn_iterative_cf
+                    t6 = time()
+                    opened6, count_visited6, count_open6, visited6, cost6 = astar_correction_factor(g, source, dest, b, heuristic) 
+                    t6 = time() - t6
+                    g.reset()'''
 
-                usedNodes = count_open5 / len(dnn_heuristic_iterative)
+                    usedNodes = count_open5 / len(dnn_heuristic_iterative)
 
-                data_io_comp5.write("""%s;%s;%s;%s;%s;%s\n""" %(expanding_factor,count_open5,t5,heuristicTime, misses, usedNodes))
-                # data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
+                    data_io_comp5.write("""%s;%s;%s;%s;%s;%s\n""" %(expanding_factor,count_open5,t5,heuristicTime, misses, usedNodes))
+                    # data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
 
-                i += 1
+                    i += 1
 
             write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_ABS'+str(mp.id_map)+'.csv', data_io_comp5)
             # write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_CF'+str(mp.id_map)+'.csv', data_io_comp6)         
 
             print('Tempo: ' + str(time() - start_time) + ' segundos')
-    
+
 
 if __name__ == '__main__':
     main()
