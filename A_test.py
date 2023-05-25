@@ -34,25 +34,15 @@ import tensorflow.compat.v1 as tf1
 
 ANGULO_MAX =30
 
-
-def r2_distance(x1, x2, y1, y2):
-    return np.sqrt(((x1 - x2) ** 2) + ((y1 - y2) ** 2))
-
-
-def r3_distance(x1, x2, y1, y2, z1, z2):
-    return np.sqrt((r2_distance(x1,x2,y1,y2) ** 2) + ((z1 - z2) ** 2))
-
 def calcula_angulo(vert,vert1):
     if vert is None or vert1 is None:
         return math.inf
     if vert == vert1:
         return math.inf
     
-    
     altura = abs(vert.get_elevation()-vert1.get_elevation())
     hipotenusa = r3_distance(vert.get_x(),vert1.get_x(),vert.get_y(),vert1.get_y(),vert.get_elevation(),vert1.get_elevation())
     seno = altura/hipotenusa
-    
     
     return math.degrees(math.asin(seno))
 
@@ -428,171 +418,6 @@ def calcula_y(x,m,n):
 def calcula_x(y,m,n):
     return (y+n)/m
 
-def line_of_sight1(s,s1,g):
-    if s is None or s1 is None:
-        return False, 10
-    x0,y0 = s.get_coordinates()
-    
-    x1,y1 = s1.get_coordinates()
-    
-    dy=y1 - y0
-    dx=x1 - x0
-    sy = 1
-    sx = 1
-    if dy < 0:
-        dy = -dy
-        sy=-1
-    if dx < 0:
-        dx = -dx
-        sx = -1
-    cost = 0
-    f=0
-    w=0    
-    
-    x_s,y_s = s.get_coordinates()
-    x_s1,y_s1 = s1.get_coordinates()
-    
-    if x_s1-x_s==0:
-        m=0
-    else:
-        m = (y_s1-y_s)/(x_s1-x_s)
-    
-    n = m*x_s - y_s
-    
-    cost=0
-    if dx >= dy:        
-        while x0 != x1:
-            f = f + dy
-            
-            vert_src = g.get_vertex_by_coords(x0,y0)
-            vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
-            vert_id = vert_tgt.get_id()            
-            
-            if f>= dx:
-                if (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
-                    
-                    return False, math.inf
-                y0 = y0 + sy
-                f = f - dx
-
-            if f!=0 and (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
-                return False, math.inf
-            new_vert1= get_id_by_coords(x0 + int((((sx-1)/2))),y0)
-            
-            new_vert2= get_id_by_coords(x0 + int((((sx-1)/2))),y0 - 1)
-            
-            if dy==0 and (vert_src.get_edge_angle(new_vert1))>ANGULO_MAX and (vert_src.get_edge_angle(new_vert2))>ANGULO_MAX:
-                return False, math.inf
-            
-            x0 = x0 + sx
-            
-    else:
-        
-        while y0 != y1:
-            f = f + dx
-            idinicial=get_id_by_coords(x0,y0)            
-            
-            vert_src = g.get_vertex_by_coords(x0,y0)
-            vert_tgt = g.get_vertex_by_coords(x0 + int((((sx-1)/2))),y0 + int((sy-1)/2))
-            vert_id = vert_tgt.get_id()
-            
-            if f >= dy:
-                vert = g.get_vertex_by_coords(x0,y0)
-                
-                if (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
-                    return False, math.inf
-                
-                x0 = x0 + sx
-                f = f - dy
-
-            if f != 0 and (vert_src.get_edge_angle(vert_id))>ANGULO_MAX:
-                return False, math.inf
-            
-            new_vert1= get_id_by_coords(x0,y0 + int((sy-1)/2))
-            
-            new_vert2= get_id_by_coords(x0 - 1,y0 + int((sy-1)/2))
-            
-            if dx == 0 and (vert_src.get_edge_angle(new_vert1))>ANGULO_MAX and (vert_src.get_edge_angle(new_vert2))>ANGULO_MAX:
-                vert = g.get_vertex_by_coords(x0,y0)
-                
-                return False, math.inf
-            y0 = y0 + sy
-            
-    return True, cost
-
-def backtracking(final,start):
-    path=[]
-    while final.get_id() != start.get_id():
-        path.append(final.get_coordinates())
-        
-        final = final.get_previous()
-    path.append(final.get_coordinates())
-    return path
-
-def calculateClusterId(current):
-    i = current.get_i()
-    j = current.get_j()
-
-    row = i // clusterDivisor
-    col = j // clusterDivisor
-
-    return row * 6 + col
-
-def astar(g, start, goal, v_weight, heuristic):
-    opened = []
-    visited = []
-    heuristic_time = 0
-
-    start.set_risk(start.get_local_risk())
-    start.set_distance(0)
-    
-    hscore = start.get_distance() + heuristic(start, goal)
-
-    unvisited_queue = [(hscore, start)]
-    heapq.heapify(unvisited_queue)
-
-    count_visited = 0
-    count_open = 1
-
-    opened.append(start.get_coordinates())
-
-    while len(unvisited_queue):
-        uv = heapq.heappop(unvisited_queue)
-        current = uv[1]
-        if current == goal:
-            distance = current.get_distance()
-            path=[]
-            
-            return visited, len(path), count_open, path, distance
-
-        current.set_visited(True)
-        count_visited = count_visited + 1
-
-        for next_id in current.get_neighbors():
-            next = g.get_vertex(next_id)
-            new_dist = current.get_distance() + current.get_edge_weight(next_id)
-            new_risk = current.get_risk() + next.get_local_risk()
-
-            if new_dist < next.get_distance():
-                next.set_previous(current)
-                next.set_distance(new_dist)
-                next.set_risk(new_risk)
-
-                t1 = time()
-                hscore = new_dist + heuristic(next, goal)
-                heuristic_time += time() - t1
-
-                if not next.visited:
-                    heapq.heappush(unvisited_queue, (hscore, next))
-                    visitedClusters[calculateClusterId(next)] = True
-                    opened.append(next.get_coordinates())
-
-def get_visited_coord(graph, visited_vertices):
-    path = []
-    for vertex_id in visited_vertices[::-1]:
-        path.append(graph.get_vertex(vertex_id).get_coordinates())
-    return path
-
 def get_id_by_coords(i, j):
     return i * GRID_COLS + j
 
@@ -655,97 +480,10 @@ def generate_sample_points(sampling_percentage):
     P.sort(key=lambda tup: (tup[1], tup[0]))
     return P
 
-def heuristic_dict1_multiplos_mapas_iterative(g, session, output_tensor, current, goal, map_id):
-    dataset = []
-    t1_start = time()
-    (x2, y2, alt2) = goal.get_r3_coordinates() 
-
-    ids = []
-    selected = []
-    current_i = current.get_i()
-    current_j = current.get_j()
-
-    expanding_factor = 24
-
-    for i in range(-expanding_factor, expanding_factor+1):
-        ids.append((current_i + i) * GRID_COLS + current_j)
-        for j in range(1, expanding_factor+1):
-            ids.append((current_i + i) * GRID_COLS + (current_j + j))
-            ids.append((current_i + i) * GRID_COLS + (current_j - j))
-
-    maximum = GRID_COLS * GRID_ROWS
-
-    for id in ids:
-        if id < 0 or id > maximum:
-            continue
-
-        vertex = g.get_vertex(id)
-        if vertex is None:
-            continue
-        if vertex.computed:
-            continue
-
-        vertex.computed = True
-        selected.append(id)
-        (x1, y1, alt1) = vertex.get_r3_coordinates()
-        
-        if x2 < x1 or (x2 == x1 and y2 < y1):
-            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
-        else:
-            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
-    
-    dataset = np.array(dataset)
-    
-    predicoes = session.run(output_tensor, {'x:0': dataset})
-
-    dict_heuristica = dict(zip(selected, predicoes))
-
-    t1_stop = time()
-
-    return dict_heuristica, t1_stop - t1_start
-
-def dict_dnn_iterative_abs(start, goal):
-    value = 0
-    global dnn_heuristic_iterative
-
-    try:
-        value = dnn_heuristic_iterative[start.get_id()][0]
-
-    except KeyError:
-        aux, _ = heuristic_dict1_multiplos_mapas_iterative(g, session_abs, output_tensor_abs, start, goal, mapId)
-        dnn_heuristic_iterative.update(aux)
-        value = dnn_heuristic_iterative[start.get_id()][0]
-
-    return value
-
-def count_visible_nodes(v, path, count_visible):
-    if v.get_local_risk() > 0:
-        count_visible += 1
-
-    if v.previous:
-        path.append(v.previous.get_id())
-        count_visible = count_visible_nodes(v.previous, path, count_visible)
-
-    return count_visible
-
-def ResetDictionary(totalClusters):
-    visited = {}
-    for i in range(totalClusters):
-        visited[i] = False
-
-    return visited
 
 def main():
-    global session_abs
-    global output_tensor_abs
-    global g
-    global mapId
-    global visitedClusters
-    global clusterDivisor
-
-    clusterDivisions = 6
-    clusterDivisor = 300 / clusterDivisions
-    visitedClusters = ResetDictionary(clusterDivisions**2)
+    global session
+    global output_tensor
 
     session_abs = tf1.InteractiveSession()
     frozen_graph="./frozen_models/frozen_graph_abs_cost.pb"
@@ -757,22 +495,28 @@ def main():
     session_abs.graph.as_default()
     tf1.import_graph_def(graph_def)    
     output_tensor_abs = session_abs.graph.get_tensor_by_name("Identity:0")
-    
+
+    session_cf = tf1.InteractiveSession()
+    frozen_graph_cf="./frozen_models/frozen_graph_cf.pb"
+
+    with tf1.gfile.GFile(frozen_graph_cf, "rb") as f:
+        graph_def = tf1.GraphDef()
+        graph_def.ParseFromString(f.read())
+
+    session_cf.graph.as_default()
+    tf1.import_graph_def(graph_def)    
+    output_tensor_cf = session_cf.graph.get_tensor_by_name("Identity:0")
+
     print('Iniciando')
     
-    if(GenerateVars.use_viewpoints):
-        maps = [GenerateVars.vps_map]
-    else:
-        maps = GenerateVars.maps
+    maps = GenerateVars.maps
         
     for mp in maps:
         i=0
         global map_id
         map_id = mp.id_map
-        if(GenerateVars.use_viewpoints):
-            map_dir = GenerateVars.vps_map_dir
-        else:
-            map_dir = GenerateVars.maps_dir
+
+        map_dir = GenerateVars.maps_dir
         
         mapId = mp.id_map
         map_path = map_dir + mp.filename
@@ -783,21 +527,32 @@ def main():
         g = Graph(mde)
         print('Gerando os viewsheds')
 
-        paths_per_map = 10_000
+        paths_per_map = 4800
 
         start_time = time()
+
         data_io_comp1 = io.StringIO()
         data_io_comp2 = io.StringIO()
         data_io_comp3 = io.StringIO()
-        
-        data_io_comp1.write("""x0,y0,x1,y1,mapId%s\n""" %(generateClusterHeader(clusterDivisions*clusterDivisions)))
-        data_io_comp2.write("""x0,y0,x1,y1,mapId,c\n""")
-        data_io_comp3.write("""x0,y0,x1,y1,mapId,c0,c1,c2,c3\n""")
+        data_io_comp4 = io.StringIO()
 
+        data_io_comp1.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        data_io_comp2.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        data_io_comp3.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        data_io_comp4.write("""custo;tempo;nodos_visitados;nodos_abertos;t_mapa_heuristico\n""")
+        
         if not os.path.exists("./DADOS_RESULTADOS/"):
             os.makedirs("./DADOS_RESULTADOS/")
 
-        b = 0.5              
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp1)
+        write_dataset_csv('./DADOS_RESULTADOS/BiA_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp2)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp3)
+        write_dataset_csv('./DADOS_RESULTADOS/BiA_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp4)
+
+        data_io_comp1 = io.StringIO()
+        data_io_comp2 = io.StringIO()
+        data_io_comp3 = io.StringIO()
+        data_io_comp4 = io.StringIO()
 
         sampling_rate = 0.125
         sample_coords = generate_sample_points(sampling_rate / 100)
@@ -811,34 +566,60 @@ def main():
 
         random.shuffle(combinations)
         combinations = combinations[:paths_per_map]
-        for pair in combinations:
-            src_coords = pair[0] 
-            dest_coords = pair[1] 
-            source_id = get_id_by_coords(src_coords[0], src_coords[1]) 
+
+        # ----------------------------------------------------------- #
+        # Itera nos N pares de origem e destino
+        for pair in combinations[:50]:
+            src_coords = pair[0]
+            dest_coords = pair[1]
+            source_id = get_id_by_coords(src_coords[0], src_coords[1])
             source = g.get_vertex(source_id)
             dest_id = get_id_by_coords(dest_coords[0], dest_coords[1])
             dest = g.get_vertex(dest_id)
+
+            global dnn_heuristic_frozen
+            global dnn_heuristic_frozen_cf
             
-            global dnn_heuristic_iterative
-            dnn_heuristic_iterative = {}
-
-            heuristic = dict_dnn_iterative_abs
-            t = time()
-            opened, count_visited, count_open, visited, cost = astar(g, source, dest, b, heuristic) 
-            t = time() - t
-
-            data_io_comp1.write("""%s,%s,%s,%s,%s%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeAllClusters()))
-            data_io_comp2.write("""%s,%s,%s,%s,%s,%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeSumOfClusters()))
-            data_io_comp3.write("""%s,%s,%s,%s,%s%s\n""" %(src_coords[0], src_coords[1], dest_coords[0], dest_coords[1], map_id, writeClusterClustering()))
-            i+=1
-
-            visitedClusters = ResetDictionary(clusterDivisions**2)
-
+            b=0
+            heuristic = heuristic_dict1_multiplos_mapas_frozen_graph
+            session = session_abs
+            output_tensor = output_tensor_abs
+            
+            t1 = time()
+            opened1, count_visited1, count_open1, visited1, cost1 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            t1 = time() - t1            
             g.reset()
 
-        write_dataset_csv('./DADOS_RESULTADOS/binaryClusters'+str(mp.id_map)+'.csv', data_io_comp1)
-        write_dataset_csv('./DADOS_RESULTADOS/sumOfClusters'+str(mp.id_map)+'.csv', data_io_comp2)
-        write_dataset_csv('./DADOS_RESULTADOS/clusterClustering'+str(mp.id_map)+'.csv', data_io_comp3)
+            t2 = time()
+            opened2, count_visited2, count_open2, visited2, cost2 = biastar(g, source, dest, b, heuristic,heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            t2 = time() - t2
+            g.reset()
+
+            
+            session = session_cf
+            output_tensor = output_tensor_cf
+
+            t3 = time()
+            opened3, count_visited3, count_open3, visited3, cost3 = astar(g, source, dest, b, heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            t3 = time() - t3            
+            g.reset()
+            
+            t4 = time()
+            opened4, count_visited4, count_open4, visited4, cost4 = biastar(g, source, dest, b, heuristic,heuristic) #fator b não é utilizado no cálculo, mas para fins de análise dos resultados
+            t4 = time() - t4
+            g.reset()
+
+            data_io_comp1.write("""%s;%s;%s;%s\n""" %(cost1,t1,count_visited1,count_open1))
+            data_io_comp2.write("""%s;%s;%s;%s\n""" %(cost2,t2,count_visited2,count_open2))
+            data_io_comp3.write("""%s;%s;%s;%s\n""" %(cost3,t3,count_visited3,count_open3))
+            data_io_comp4.write("""%s;%s;%s;%s\n""" %(cost4,t4,count_visited4,count_open4))
+            i+=1
+            print(i)
+            
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp1)
+        write_dataset_csv('./DADOS_RESULTADOS/BiA_star_FROZEN_ABS'+str(mp.id_map)+'.csv', data_io_comp2)
+        write_dataset_csv('./DADOS_RESULTADOS/A_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp3)
+        write_dataset_csv('./DADOS_RESULTADOS/BiA_star_FROZEN_CF'+str(mp.id_map)+'.csv', data_io_comp4)
 
         print('Tempo: ' + str(time() - start_time) + ' segundos')
 
