@@ -42,3 +42,29 @@ def calcula_custo_theta(vert1,vert2,multiplicador):
     if vert1 is None or vert2 is None:
         return False, math.inf
     return True, r3_heuristic(vert1,vert2)*multiplicador
+
+def heuristic_dict1_multiplos_mapas_frozen_graph(g, goal, map_id, session, output_tensor):
+    t1_start = time()
+    todos_vertices = g.get_vertices()
+    vertice_y = goal
+    (x2, y2, alt2) = vertice_y.get_r3_coordinates() # goal
+
+    dataset = []
+    (x2, y2, alt2) = goal.get_r3_coordinates() # goal
+    for vertice_x in g:
+        (x1, y1, alt1) = vertice_x.get_r3_coordinates() # current
+
+        # Ordena origem e destino da esquerda pra direita, de cima pra baixo (mesma ordem realizada no treinamento da DNN)
+        if x2 < x1 or (x2 == x1 and y2 < y1):
+            dataset.append([map_id, x2, y2, alt2, x1, y1, alt1])
+        else:
+            dataset.append([map_id, x1, y1, alt1, x2, y2, alt2])
+
+    # Monta um dicionário com as predições da DNN
+    dataset = np.array(dataset)
+    result = session.run(output_tensor, {'x:0': dataset})
+    #with tf.device('/gpu:0'):
+    dict_heuristica = dict(zip(todos_vertices, result))
+    t1_stop = time()
+
+    return dict_heuristica, t1_stop - t1_start

@@ -1,6 +1,7 @@
 import math
-import r3_distance from Heuristics
-import MDEVars from config_variables
+
+from Utilities.Heuristics import r3_distance
+from config_variables import MDEVars
 
 class Vertex:
     def __init__(self, elevation, node_id):
@@ -52,8 +53,7 @@ class Vertex:
         return self.j * MDEVars.CELL_WIDTH
 
     def get_y(self):
-        return self.i * self.graph.cell_height
-
+        return self.i * MDEVars.CELL_HEIGHT
     def get_i(self):
         return math.floor(self.id / MDEVars.GRID_ROWS)
 

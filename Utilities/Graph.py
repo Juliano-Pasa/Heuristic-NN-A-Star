@@ -1,7 +1,7 @@
 import numpy as np
 
-import Vertex
-from Heuristics import r3_distance
+from Utilities.Vertex import Vertex
+from Utilities.Heuristics import r3_distance
 from config_variables import MDEVars
 
 class Mde:
@@ -88,6 +88,9 @@ class Graph:
             return self.vertices[id]
         else:
             return None
+
+    def get_id_by_coords(i, j):
+        return i * MDEVars.GRID_COLS + j
 
     def get_vertex_by_coords(self, i, j):
         id = get_id_by_coords(i,j)
@@ -218,3 +221,5 @@ class Graph:
                         if weight < self.min_edge:
                             self.min_edge = weight
                         vertex.add_edge(vertex2_id, weight, self)
+        
+    

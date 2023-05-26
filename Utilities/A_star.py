@@ -1,4 +1,4 @@
-
+from Utilities.Heuristics import *
 
 def safe_astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -67,7 +67,7 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    hscore = start.get_distance() + r3_heuristic(start, goal)*heuristic(start,goal)
+    hscore = start.get_distance() + r3_heuristic(start, goal)*heuristic[start.get_id(), 0]
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
@@ -104,7 +104,7 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
                 next.set_distance(new_dist)
                 next.set_risk(new_risk)
                 #print("retorno do fator de correção",heuristic(next,goal))
-                hscore = new_dist + r3_heuristic(next, goal)*heuristic(next,goal)
+                hscore = new_dist + r3_heuristic(next, goal)*heuristic[next_id, 0]
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -124,7 +124,7 @@ def astar(g, start, goal, v_weight, heuristic):
     start.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    hscore = start.get_distance() + heuristic(start, goal)
+    hscore = start.get_distance() + heuristic[start.get_id(), 0]
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
@@ -163,7 +163,7 @@ def astar(g, start, goal, v_weight, heuristic):
                 next.set_risk(new_risk)
 
                 t1 = time()
-                hscore = new_dist + heuristic(next, goal)
+                hscore = new_dist + heuristic[next_id, 0]
                 heuristic_time += time() - t1
 
                 if not next.visited:
