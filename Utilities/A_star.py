@@ -1,4 +1,14 @@
 from Utilities.Heuristics import *
+import heapq
+
+def backtracking(final,start):
+    path=[]
+    while final.get_id() != start.get_id():
+        path.append(final.get_coordinates())
+        
+        final = final.get_previous()
+    path.append(final.get_coordinates())
+    return path
 
 def safe_astar(g, start, goal, v_weight, heuristic):
     opened = []

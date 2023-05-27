@@ -1,3 +1,30 @@
+from Utilities.Heuristics import *
+import heapq
+
+def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open, heuristic,g):
+    distance = current.get_distance() + currentReversed.get_distance() + r3_heuristic(current, currentReversed)
+    path = []
+    count_visited = 0
+
+    #print("salvando o path\n")
+    while currentReversed.get_id() != goal.get_id():
+        path.append(currentReversed.get_coordinates())
+        currentReversed = currentReversed.get_previous()
+
+    path.append(currentReversed.get_coordinates())
+    path = path[::-1]
+
+    while current.get_id() != start.get_id():
+        path.append(current.get_coordinates())
+        current = current.get_previous()
+
+    path.append(current.get_coordinates())
+
+    expanded.extend(expandedReverse)
+    #expanded.reverse()
+    closed_nodes = list(map(lambda v: g.get_vertex(v).get_coordinates(), expanded))
+    #print(expanded)
+    return closed_nodes, len(path), count_open, path, distance
 
 #Bidirectional A*
 #Bidirectional A*
