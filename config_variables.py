@@ -53,6 +53,15 @@ class VPCase:
         self.id_vp = id_vp
         self.point = (x, y)
 
+class MDEVars:
+    GRID_ROWS = 0
+    GRID_COLS = 0
+    GRID_WIDTH = 0
+    GRID_HEIGHT = 0
+    CELL_WIDTH = 0
+    CELL_HEIGHT = 0
+    
+
 class GenerateVars:   
 
     #Configurações gerais 
