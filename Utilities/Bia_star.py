@@ -40,7 +40,7 @@ def biastar(g, start, goal, v_weight, heuristic, heuristic1):
     goal.set_distance(0)
 
     # Calcula custo = w * risco + distancia + heursítica_r3
-    hscore = start.get_distance() + heuristic(start, goal)
+    hscore = start.get_distance() + heuristic[start.get_id()][0]
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
     unvisited_queue_reverse = [(hscore, goal)]
@@ -78,7 +78,7 @@ def biastar(g, start, goal, v_weight, heuristic, heuristic1):
                 next.set_previous(current)
                 next.set_distance(new_dist)
 
-                hscore = new_dist + heuristic(next, goal)
+                hscore = new_dist + heuristic[next_id][0]
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
@@ -110,7 +110,7 @@ def biastar(g, start, goal, v_weight, heuristic, heuristic1):
                 next.set_previous(current)
                 next.set_distance(new_dist)
 
-                hscore = new_dist + heuristic1(next, goal)
+                hscore = new_dist + heuristic1[next_id][0]
 
                 if not next.visitedReverse:
                     heapq.heappush(unvisited_queue_reverse, (hscore, next))
