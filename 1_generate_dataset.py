@@ -7,7 +7,9 @@ import math
 import csv
 import os
 import glob
-from config_variables import GenerateVars, MapCase, VPCase
+from Utilities.Graph import *
+from Utilities.Vertex import *
+from config_variables import GenerateVars, MapCase, VPCase, MDEVars
 import matplotlib.image as mpimg
 from time import process_time
 from numba import cuda, jit
@@ -22,303 +24,6 @@ def r2_distance(x1, x2, y1, y2):
 def r3_distance(x1, x2, y1, y2, z1, z2):
     return np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2 + (z1 - z2) ** 2)
 
-
-class Mde:
-    # https://rasterio.readthedocs.io/en/latest/quickstart.html
-    import rasterio
-
-    # Parametros:
-    # fp = nome do arquivo raster;
-    # reduction_factor = grau de redução da dimensão do mapa
-    def __init__(self, fp, reduction_factor):
-        self.dataset = self.rasterio.open(fp)
-        self.band1 = self.dataset.read(1)
-        self.pixel_resolution = GenerateVars.pixel_resolution #round(self.dataset.transform[0] * 108000)
-        self.h_limit = self.dataset.height
-        self.w_limit = self.dataset.width
-
-        # Redimensiona o grid
-        self.generate_grid(reduction_factor)
-
-        self.cell_size = self.pixel_resolution * reduction_factor
-        global CELL_HEIGHT, CELL_WIDTH, GRID_ROWS, GRID_COLS, GRID_HEIGHT, GRID_WIDTH
-        CELL_HEIGHT = self.pixel_resolution * reduction_factor
-        CELL_WIDTH = self.pixel_resolution * reduction_factor
-        GRID_COLS = self.grid.shape[0]
-        GRID_ROWS = self.grid.shape[1]
-        GRID_WIDTH = CELL_WIDTH * GRID_COLS
-        GRID_HEIGHT = CELL_HEIGHT * GRID_ROWS
-
-    # Gera o grid com dimensão reduzida
-    # Ex: reduction_factor = 2, mapa 400x400 reduzido para 200x200
-    def generate_grid(self, reduction_factor):
-        x = int(self.h_limit / reduction_factor)
-        y = int(self.w_limit / reduction_factor)
-        self.grid = np.zeros(shape=(x, y))
-        for i in range(x):
-            for j in range(y):
-                sub_section = self.band1[i * reduction_factor: (i + 1) * reduction_factor, j * reduction_factor: (j + 1) * reduction_factor]
-                self.grid[i, j] = np.sum(sub_section)
-                self.grid[i, j] = round(self.grid[i, j] / (len(sub_section) * len(sub_section[0])))
-
-    def get_cell_size(self):
-        return self.cell_size
-
-class Vertex:
-    def __init__(self, elevation, node_id):
-        self.local_risk = 0
-        self.elevation = elevation
-        self.id = node_id
-        self.edges = {}
-        self.distance = 99999999    # Somatório da distância percorrida da origem até o vértice
-        self.risk = 99999999    # Somatório do grau de visibilidade da origem até o vértice
-        self.previous = None
-        self.visited = False
-
-    def __str__(self):
-        return str(self.id) + ' elevation: ' + str(self.elevation) + ' coord: ' + str(self.get_r2_coordinates()) + ' edges: ' + str([x for x in self.edges.keys()]) + str([x for x in self.edges.values()])
-
-    def add_edge(self, node_id, edge_weight):
-        self.edges[node_id] = edge_weight
-
-    def get_id(self):
-        return self.id
-
-    def get_neighbors(self):
-        return self.edges.keys()
-
-    def get_x(self):
-        return self.get_j() * CELL_WIDTH
-
-    def get_y(self):
-        return self.get_i() * CELL_HEIGHT
-
-    def get_i(self):
-        return math.floor(self.id / GRID_ROWS)
-
-    def get_j(self):
-        return self.id % GRID_COLS
-
-    def get_r2_coordinates(self):
-        return self.get_x(), self.get_y()
-
-    def get_coordinates(self):
-        return self.get_i(), self.get_j()
-
-    def get_elevation(self):
-        return self.elevation
-
-    def get_edge_weight(self, vertex_id):
-        return self.edges[vertex_id]
-
-    def set_previous(self, prev):
-        self.previous = prev
-
-    def set_visited(self, visit):
-        self.visited = visit
-
-    def set_distance(self, distance):
-        self.distance = distance
-
-    def get_distance(self):
-        return self.distance
-
-    def set_risk(self, risk):
-        self.risk = risk
-
-    def get_risk(self):
-        return self.risk
-
-    # Reseta os valores do vértice para computar outro caminho utilizando o A*
-    def reset(self):
-        self.distance = 99999999
-        self.risk = 99999999
-        self.previous = None
-        self.visited = False
-
-    def set_local_risk(self, local_risk):
-        self.local_risk = local_risk
-
-    def get_local_risk(self):
-        return self.local_risk
-
-    #def __lt__(self, other):
-    #    return self.distance < other.distance
-
-    def __eq__(self, other):
-        return self.id == other.get_id()
-
-class Graph:
-    def __init__(self, mde):
-        self.vertices = {}  # Dicionário de vértices: key = id, value = objeto Vertex
-        self.max_edge = 0.0
-        self.min_edge = float("inf")
-        self.create_vertices(mde)   # Popula o dicionário de vértices com 1 vértice para cada célula do grid do mde
-        self.generate_edges(False)  # Parâmetro: True = considera as travessias diagonais; False = considera apenas os vizinhos imediatos
-
-    def __iter__(self):
-        return iter(self.vertices.values())
-
-    # Método para resetar o grafo a cada busca
-    def reset(self):
-        for v in self:
-            v.reset()
-
-    def __str__(self):
-        for v in self:
-            print(v)
-
-    def create_vertices(self, mde):
-        for i in range(GRID_ROWS):
-            for j in range(GRID_COLS):
-                vertex_elevation = mde.grid[i, j]
-                vertex_id = i * GRID_COLS + j
-                self.add_vertex(vertex_elevation, vertex_id)
-
-    # Atribui o grau de visibilidade ao risco de cada vértice, baseado no parâmetro mapa de visibilidade "viewshed"
-    def update_vertices_risk(self, viewshed):
-        for v in self:
-            i,j = v.get_coordinates()
-            v.set_local_risk(viewshed[i,j])
-
-    def get_vertex(self, id):
-        if id in self.vertices:
-            return self.vertices[id]
-        else:
-            return None
-
-    def get_vertex_by_coords(self, i, j):
-        id = get_id_by_coords(i,j)
-        return self.get_vertex(id)
-
-    def get_vertices(self):
-        return self.vertices.keys()
-
-    def add_vertex(self, elevation, id):
-        self.vertices[id] = Vertex(elevation, id)
-
-    def generate_edges(self, diagonal):
-        for vertex_id, vertex in self.vertices.items():
-            i, j = vertex.get_coordinates()
-
-            j1 = j + 1
-            i1 = i
-            if j1 < GRID_COLS:
-                vertex2_id = i1 * GRID_COLS + j1
-                vertex2 = self.get_vertex(vertex2_id)
-                if vertex2:
-                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),  # peso da aresta = distância Eclidiana no R3
-                                         vertex.get_elevation(), vertex2.get_elevation())
-                    if weight > self.max_edge:
-                        self.max_edge = weight
-                    if weight < self.min_edge:
-                        self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
-
-
-            j1 = j - 1
-            i1 = i
-            if j1 >= 0:
-                vertex2_id = i1 * GRID_COLS + j1
-                vertex2 = self.get_vertex(vertex2_id)
-                if vertex2:
-                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                           vertex.get_elevation(), vertex2.get_elevation())
-                    if weight > self.max_edge:
-                        self.max_edge = weight
-                    if weight < self.min_edge:
-                        self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
-
-
-            j1 = j
-            i1 = i + 1
-            if i1 < GRID_ROWS:
-                vertex2_id = i1 * GRID_COLS + j1
-                vertex2 = self.get_vertex(vertex2_id)
-                if vertex2:
-                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                           vertex.get_elevation(), vertex2.get_elevation())
-                    if weight > self.max_edge:
-                        self.max_edge = weight
-                    if weight < self.min_edge:
-                        self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
-
-            j1 = j
-            i1 = i - 1
-            if i1 >= 0:
-                vertex2_id = i1 * GRID_COLS + j1
-                vertex2 = self.get_vertex(vertex2_id)
-                if vertex2:
-                    weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                           vertex.get_elevation(), vertex2.get_elevation())
-                    if weight > self.max_edge:
-                        self.max_edge = weight
-                    if weight < self.min_edge:
-                        self.min_edge = weight
-                    vertex.add_edge(vertex2_id, weight)
-
-            if diagonal:
-                j1 = j + 1
-                i1 = i + 1
-                if j1 < GRID_COLS and i1 < GRID_ROWS:
-                    vertex2_id = i1 * GRID_COLS + j1
-                    vertex2 = self.get_vertex(vertex2_id)
-                    if vertex2:
-                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                             vertex.get_elevation(), vertex2.get_elevation())
-                        if weight > self.max_edge:
-                            self.max_edge = weight
-                        if weight < self.min_edge:
-                            self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
-
-                j1 = j - 1
-                i1 = i + 1
-                if j1 >= 0 and i1 < GRID_ROWS:
-                    vertex2_id = i1 * GRID_COLS + j1
-                    vertex2 = self.get_vertex(vertex2_id)
-                    if vertex2:
-                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                             vertex.get_elevation(), vertex2.get_elevation())
-                        if weight > self.max_edge:
-                            self.max_edge = weight
-                        if weight < self.min_edge:
-                            self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
-
-                j1 = j + 1
-                i1 = i - 1
-                if i1 >= 0 and j1 < GRID_COLS:
-                    vertex2_id = i1 * GRID_COLS + j1
-                    vertex2 = self.get_vertex(vertex2_id)
-                    if vertex2:
-                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                             vertex.get_elevation(), vertex2.get_elevation())
-                        if weight > self.max_edge:
-                            self.max_edge = weight
-                        if weight < self.min_edge:
-                            self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
-
-                j1 = j - 1
-                i1 = i - 1
-                if i1 >= 0 and j1 >= 0:
-                    vertex2_id = i1 * GRID_COLS + j1
-                    vertex2 = self.get_vertex(vertex2_id)
-                    if vertex2:
-                        weight = r3_distance(vertex.get_x(), vertex2.get_x(), vertex.get_y(), vertex2.get_y(),
-                                             vertex.get_elevation(), vertex2.get_elevation())
-                        if weight > self.max_edge:
-                            self.max_edge = weight
-                        if weight < self.min_edge:
-                            self.min_edge = weight
-                        vertex.add_edge(vertex2_id, weight)
-
-    # Passa os valores de visbilidade [0, 1] para [0, max(edge) - min(edge)]
-    def normalize_visibility(self, visibility):
-        return visibility * (self.max_edge - self.min_edge)
 
 
 # Recupera o caminho percorrendo do fim para o inicio
@@ -348,7 +53,7 @@ def get_visited_coord(graph, visited_vertices):
 
 # Recupera o id do vértice a partir das coordenadas no grid
 def get_id_by_coords(i, j):
-    return i * GRID_COLS + j
+    return i * MDEVars.GRID_COLS + j
 
 
 # Escreve os nodos do caminho em um arquivo csv
@@ -371,7 +76,7 @@ def save_viewsheds_vpconfigs(grid, vpconfigs, view_radius, viewpoint_height):
     #todos = np.zeros((grid.shape[0], grid.shape[1]))
     for vpconfig in vpconfigs:
         vps = extract_vps_from_config(vpconfig)
-        viewshed = vs.generate_viewshed_vpconfigs(grid, vps, view_radius, CELL_WIDTH, viewpoint_height)
+        viewshed = vs.generate_viewshed_vpconfigs(grid, vps, view_radius, MDEVars.CELL_WIDTH, viewpoint_height)
         #todos = todos + viewshed
         output_file = './VIEWSHED_CONFIG_' + str(vpconfig) +'.png'
         vs.save_viewshed_image(viewshed, './VIEWSHEDS/' + output_file)
@@ -381,7 +86,7 @@ def save_viewsheds_vpconfigs(grid, vpconfigs, view_radius, viewpoint_height):
 def save_viewsheds(grid, viewpoints, view_radius, viewpoint_height):
     #todos = np.zeros((grid.shape[0], grid.shape[1]))
     for viewpoint_i, viewpoint_j in viewpoints:
-        viewshed = vs.generate_viewshed(grid, viewpoint_i, viewpoint_j, view_radius, CELL_WIDTH, viewpoint_height)
+        viewshed = vs.generate_viewshed(grid, viewpoint_i, viewpoint_j, view_radius, MDEVars.CELL_WIDTH, viewpoint_height)
         #todos = todos + viewshed
         output_file = 'VIEWSHED_' + str(viewpoint_i) + '_' + str(viewpoint_j) + '.png'
         vs.save_viewshed_image(viewshed, './VIEWSHEDS/' + output_file)
@@ -522,8 +227,8 @@ def generate_sssp_arrays(g):
     V = [] #lista de vertex
     E = [] #lista de edges
     W = [] #lista de pesos
-    for i in range(GRID_ROWS):
-        for j in range(GRID_COLS):
+    for i in range(MDEVars.GRID_ROWS):
+        for j in range(MDEVars.GRID_COLS):
             v_id = get_id_by_coords(i, j)
             v = g.get_vertex(v_id)
             edges_index = len(E)
@@ -539,8 +244,8 @@ def generate_sssp_arrays(g):
 # Retorna o mapa de visibilidade como lista, o indice da lista é o id do respectivo vértice
 def serialize_viewshed(viewshed):
     serialized_viewshed = []
-    for i in range(GRID_ROWS):
-        for j in range(GRID_COLS):
+    for i in range(MDEVars.GRID_ROWS):
+        for j in range(MDEVars.GRID_COLS):
             serialized_viewshed.append(viewshed[i, j])
     return np.array(serialized_viewshed)
 
@@ -629,7 +334,7 @@ def generate_dataset():
         # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
 
     # Coordenadas de cada observador
-        viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
+        viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 1)
         # Raio de visão dos observadores
         view_radius = 40
         # Altura do observador (metros) em relação ao chão
@@ -669,34 +374,34 @@ def generate_dataset():
                 for dest_coords in sample_coords[aux+1:]:
                     dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
                     data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
-                    str(int(src_coords[1] * CELL_WIDTH)), 
-                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(int(src_coords[1] * MDEVars.CELL_WIDTH)), 
+                    str(int(src_coords[0] * MDEVars.CELL_HEIGHT)),
                     str(mde.grid[src_coords[0], src_coords[1]]), 
-                    str(int(dest_coords[1] * CELL_WIDTH)),
-                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    str(int(dest_coords[1] * MDEVars.CELL_WIDTH)),
+                    str(int(dest_coords[0] * MDEVars.CELL_HEIGHT)), 
                     mde.grid[dest_coords[0], dest_coords[1]], 
                     C[dest]))
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH),int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
             elif(GenerateVars.type_dataset == 2):
                 for dest_coords in sample_coords[aux+1:]:
                     dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
                     data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
-                    str(int(src_coords[1] * CELL_WIDTH)), 
-                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(int(src_coords[1] * MDEVars.CELL_WIDTH)), 
+                    str(int(src_coords[0] * MDEVars.CELL_HEIGHT)),
                     str(mde.grid[src_coords[0], src_coords[1]]), 
-                    str(int(dest_coords[1] * CELL_WIDTH)),
-                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    str(int(dest_coords[1] * MDEVars.CELL_WIDTH)),
+                    str(int(dest_coords[0] * MDEVars.CELL_HEIGHT)), 
                     mde.grid[dest_coords[0], dest_coords[1]], 
                     C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
             elif(GenerateVars.type_dataset == 3):
                 for dest_coords in sample_coords[aux+1:]:
                     dest = get_id_by_coords(dest_coords[0], dest_coords[1])                
                     data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (mp.id_map, 
-                    str(int(src_coords[1] * CELL_WIDTH)), 
-                    str(int(src_coords[0] * CELL_HEIGHT)),
+                    str(int(src_coords[1] * MDEVars.CELL_WIDTH)), 
+                    str(int(src_coords[0] * MDEVars.CELL_HEIGHT)),
                     str(mde.grid[src_coords[0], src_coords[1]]), 
-                    str(int(dest_coords[1] * CELL_WIDTH)),
-                    str(int(dest_coords[0] * CELL_HEIGHT)), 
+                    str(int(dest_coords[1] * MDEVars.CELL_WIDTH)),
+                    str(int(dest_coords[0] * MDEVars.CELL_HEIGHT)), 
                     mde.grid[dest_coords[0], dest_coords[1]], 
                     r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
                 
@@ -725,7 +430,7 @@ def generate_dataset_with_viewpoints():
 
     print('Gerando os viewsheds')
     # Coordenadas de cada observador
-    viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
+    viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 10)
     # Raio de visão dos observadores
     view_radius = 40
     # Altura do observador (metros) em relação ao chão
@@ -763,9 +468,9 @@ def generate_dataset_with_viewpoints():
             # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
             for dest_coords in sample_coords[aux+1:]:
                 dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH),int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
+                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
             aux = aux +1
 
             write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
@@ -802,7 +507,7 @@ def generate_dataset_with_vpconfigs():
 
     print('Gerando os viewsheds')
     # Coordenadas de cada observador
-    #viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 10)
+    #viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 10)
     #viewpoints = GenerateVars.viewpoints
     vpconfigs = GenerateVars.random_vpconfigs(10,20,20)
     #vpconfigs = GenerateVars.vpconfigs
@@ -848,19 +553,19 @@ def generate_dataset_with_vpconfigs():
             if(GenerateVars.type_dataset == 1):
                 for dest_coords in sample_coords[aux+1:]:
                     dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH),int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * CELL_WIDTH), int(vp[0] * CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * CELL_WIDTH), int(src_coords[0] * CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * CELL_WIDTH), int(dest_coords[0] * CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH),int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
+                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
                 aux = aux +1
             elif(GenerateVars.type_dataset == 2):
                 for dest_coords in sample_coords[aux+1:]:
                     dest = get_id_by_coords(dest_coords[0], dest_coords[1])
                     data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, 
-                    int(src_coords[1] * CELL_WIDTH),
-                    int(src_coords[0] * CELL_HEIGHT),
+                    int(src_coords[1] * MDEVars.CELL_WIDTH),
+                    int(src_coords[0] * MDEVars.CELL_HEIGHT),
                     mde.grid[src_coords[0], src_coords[1]], 
-                    int(dest_coords[1] * CELL_WIDTH),
-                    int(dest_coords[0] * CELL_HEIGHT), 
+                    int(dest_coords[1] * MDEVars.CELL_WIDTH),
+                    int(dest_coords[0] * MDEVars.CELL_HEIGHT), 
                     mde.grid[dest_coords[0], dest_coords[1]], 
                     C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
                     

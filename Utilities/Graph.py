@@ -222,4 +222,6 @@ class Graph:
                             self.min_edge = weight
                         vertex.add_edge(vertex2_id, weight, self)
         
+    def normalize_visibility(self, visibility):
+        return visibility * (self.max_edge - self.min_edge)
     
