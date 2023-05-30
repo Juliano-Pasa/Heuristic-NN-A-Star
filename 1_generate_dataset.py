@@ -72,17 +72,6 @@ def write_dataset_csv(filename, data_io):
 
 
 # Gera e salva os mapas de visibilidade em arquivos png
-def save_viewsheds_vpconfigs(grid, vpconfigs, view_radius, viewpoint_height):
-    #todos = np.zeros((grid.shape[0], grid.shape[1]))
-    for vpconfig in vpconfigs:
-        vps = extract_vps_from_config(vpconfig)
-        viewshed = vs.generate_viewshed_vpconfigs(grid, vps, view_radius, MDEVars.CELL_WIDTH, viewpoint_height)
-        #todos = todos + viewshed
-        output_file = './VIEWSHED_CONFIG_' + str(vpconfig) +'.png'
-        vs.save_viewshed_image(viewshed, './VIEWSHEDS/' + output_file)
-    #vs.save_viewshed_image(todos, './VIEWSHEDS/todos.png')
-    
-# Gera e salva os mapas de visibilidade em arquivos png
 def save_viewsheds(grid, viewpoints, view_radius, viewpoint_height):
     #todos = np.zeros((grid.shape[0], grid.shape[1]))
     for viewpoint_i, viewpoint_j in viewpoints:
@@ -235,9 +224,7 @@ def generate_sssp_arrays(g):
             V.append(edges_index)
             for u_id in v.get_neighbors():
                 E.append(u_id)
-                #print("\n\n\n\n aaaaaaaaaaaaa socorro", v.edges[u_id])
                 W.append(v.edges[u_id])
-           # exit()  
 
     return np.array(V), np.array(E), np.array(W)
 
@@ -319,9 +306,8 @@ def generate_dataset():
     #   MUDAR ROWS E COLLUMNS DE ACORDO COM O TAMANHO DO MAPA
     #   
     
-
-
     count=0
+    
     for mp in GenerateVars.maps:
         map_path = GenerateVars.maps_dir + mp.filename
         mde = Mde(map_path, mp.reduction_factor)
@@ -333,7 +319,7 @@ def generate_dataset():
         g = Graph(mde)
         # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
 
-    # Coordenadas de cada observador
+        # Coordenadas de cada observador
         viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 1)
         # Raio de visão dos observadores
         view_radius = 40
@@ -350,10 +336,10 @@ def generate_dataset():
 
         V, E, W = generate_sssp_arrays(g)
 
-        print('Gerando o dataset: ',count)
+        print('Gerando o dataset: ', count)
         count=+1
+        
         # Realiza o mesmo processo para cada observador
-
         start_time = process_time()
         visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(viewpoints[0][0]) + '_' + str(viewpoints[0][1]) + '.png'
 
@@ -407,181 +393,13 @@ def generate_dataset():
                 
             aux = aux +1
 
-            write_dataset_csv('dataset_sem_observador_mapa_\\'+str(mp.id_map)+'.csv', data_io)
+            write_dataset_csv('dataset_sem_observador_mapa_\\VASCPO'+str(mp.id_map)+'.csv', data_io)
         print('Tempo: ' + str(process_time() - start_time) + ' segundos')
         
-
-    print('Dataset gerado com sucesso!')
-    
-def generate_dataset_with_viewpoints():    
-    filename = GenerateVars.vps_map_dir + GenerateVars.vps_map.filename
-    reduction_factor = GenerateVars.vps_map.reduction_factor
-
-    # Lê o grid do MDE do terreno
-    mde = Mde(filename, reduction_factor)
-
-    print('Criando o grafo')
-    # Cria o grafo a partir do MDE
-    g = Graph(mde)
-
-    print('Gerando os pontos de amostra')
-    sampling_rate = GenerateVars.sampling_rate
-    sample_coords = generate_sample_points(sampling_rate/100) # Gera os pontos de amostra
-
-    print('Gerando os viewsheds')
-    # Coordenadas de cada observador
-    viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 10)
-    # Raio de visão dos observadores
-    view_radius = 40
-    # Altura do observador (metros) em relação ao chão
-    viewpoint_height = 5
-
-    print('Salvando os viewsheds')
-    if not os.path.exists("./VIEWSHEDS/"):
-        os.makedirs("./VIEWSHEDS/")
-    files = glob.glob('./VIEWSHEDS/*')
-    for f in files:
-        os.remove(f)
-    save_viewsheds(mde.grid, viewpoints, view_radius, viewpoint_height)
-
-    # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
-    V, E, W = generate_sssp_arrays(g)
-    # V = lista de vertex, E = lista de edges, W = lista de pesos
-
-    print('Gerando o dataset')
-    # Realiza o mesmo processo para cada observador
-    for vp in viewpoints:
-        start_time = process_time()
-        visibility_map_file = './VIEWSHEDS/VIEWSHED_' + str(vp[0]) + '_' + str(vp[1]) + '.png'
-
-        viewshed = read_viewshed(visibility_map_file)
-        viewshed = g.normalize_visibility(viewshed)
-        S = serialize_viewshed(viewshed)
-
-        aux = 0
-        for src_coords in sample_coords:
-            data_io = io.StringIO()
-            source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-            b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-            C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
-
-            # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-            for dest_coords in sample_coords[aux+1:]:
-                dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                data_io.write("""%s,%s,%s,%s,%s,%s,%s\n""" % (int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH),int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
-                #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-            aux = aux +1
-
-            write_dataset_csv('dataset_'+str(len(viewpoints))+'_'+str(sampling_rate)+'.csv', data_io)
-        print('Tempo: ' + str(process_time() - start_time) + ' segundos')
-
     print('Dataset gerado com sucesso!')
    
-def extract_vps_from_config(vpconfig):
-    highest_pot = len(GenerateVars.viewpoints) - 1
-    config_val = vpconfig
-    points = []
-    for i in range(highest_pot, -1, -1):
-        if(config_val - GenerateVars.viewpoints[i].id_vp >= 0):
-            config_val = config_val - GenerateVars.viewpoints[i].id_vp
-            points.append(GenerateVars.viewpoints[i].point)
-        
-    print(points)
-    return points
-
-def generate_dataset_with_vpconfigs():    
-    filename = GenerateVars.vps_map_dir + GenerateVars.vps_map.filename
-    reduction_factor = GenerateVars.vps_map.reduction_factor
-
-    # Lê o grid do MDE do terreno
-    mde = Mde(filename, reduction_factor)
-
-    print('Criando o grafo')
-    # Cria o grafo a partir do MDE
-    g = Graph(mde)
-
-    print('Gerando os pontos de amostra')
-    sampling_rate = 10#GenerateVars.sampling_rate
-    sample_coords = generate_sample_points(sampling_rate/100,rows=400,collumns=400) # Gera os pontos de amostra
-
-    print('Gerando os viewsheds')
-    # Coordenadas de cada observador
-    #viewpoints = observer_points(mde.grid, MDEVars.GRID_ROWS, MDEVars.GRID_COLS, 10)
-    #viewpoints = GenerateVars.viewpoints
-    vpconfigs = GenerateVars.random_vpconfigs(10,20,20)
-    #vpconfigs = GenerateVars.vpconfigs
-    # Raio de visão dos observadores
-    view_radius = 40
-    # Altura do observador (metros) em relação ao chão
-    viewpoint_height = 5
-
-
-    
-    if not os.path.exists("./VIEWSHEDS/"):
-        os.makedirs("./VIEWSHEDS/")
-    files = glob.glob('./VIEWSHEDS/*')
-    if(len(files) > 0):
-        print("Utilizando os viewshed já existentes.")
-    else:
-        print('Salvando os viewsheds.')
-        for f in files:
-            os.remove(f)
-        save_viewsheds_vpconfigs(mde.grid, vpconfigs, view_radius, viewpoint_height)
-
-    # Transforma o grafo em 3 listas de vértices, arestas e pesos das arestas
-    V, E, W = generate_sssp_arrays(g)
-
-    print('Gerando o dataset')
-    # Realiza o mesmo processo para cada observador
-    for vpconfig in GenerateVars.vpconfigs:
-        start_time = process_time()
-        visibility_map_file = './VIEWSHEDS/VIEWSHED_CONFIG_' + str(vpconfig) +'.png'
-
-        viewshed = read_viewshed(visibility_map_file)
-        viewshed = g.normalize_visibility(viewshed)
-        S = serialize_viewshed(viewshed)
-
-        aux = 0
-        for src_coords in sample_coords:
-            data_io = io.StringIO()
-            source = get_id_by_coords(src_coords[0], src_coords[1]) # Cada ponto da amostra é o ponto de origem da iteração
-            b = 0.5 # Fator de importância da segurança no cálculo do custo -> 0 para dijkstra padrão
-            C = cuda_safe_sssp(V, E, W, S, source, b) # Gera o mapa de custos
-
-            # Coleta os custos para cada um dos pontos seguintes da lista de pontos amostrados para evitar caminhos repetidos;
-            if(GenerateVars.type_dataset == 1):
-                for dest_coords in sample_coords[aux+1:]:
-                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT),mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH),int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest])) certo?
-                    #data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n""" % (int(vp[1] * MDEVars.CELL_WIDTH), int(vp[0] * MDEVars.CELL_HEIGHT), mde.grid[vp[0], vp[1]], int(src_coords[1] * MDEVars.CELL_WIDTH), int(src_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[src_coords[0], src_coords[1]], int(dest_coords[1] * MDEVars.CELL_WIDTH), int(dest_coords[0] * MDEVars.CELL_HEIGHT), mde.grid[dest_coords[0], dest_coords[1]], C[dest]))
-                aux = aux +1
-            elif(GenerateVars.type_dataset == 2):
-                for dest_coords in sample_coords[aux+1:]:
-                    dest = get_id_by_coords(dest_coords[0], dest_coords[1])
-                    data_io.write("""%s,%s,%s,%s,%s,%s,%s,%s\n""" % (vpconfig, 
-                    int(src_coords[1] * MDEVars.CELL_WIDTH),
-                    int(src_coords[0] * MDEVars.CELL_HEIGHT),
-                    mde.grid[src_coords[0], src_coords[1]], 
-                    int(dest_coords[1] * MDEVars.CELL_WIDTH),
-                    int(dest_coords[0] * MDEVars.CELL_HEIGHT), 
-                    mde.grid[dest_coords[0], dest_coords[1]], 
-                    C[dest]/r3_heuristic(g.get_vertex(source),g.get_vertex(dest))))
-                    
-            write_dataset_csv('./dataset_com_observador_CF_mapa/dataset_'+str(vpconfig)+'_'+str(sampling_rate)+'.csv', data_io)
-        print('Tempo: ' + str(process_time() - start_time) + ' segundos')
-
-    print('Dataset gerado com sucesso!')
-    
 def main():
-    print("Casco")
-    print(GenerateVars.maps_dir)
-    if(GenerateVars.use_viewpoints):
-        #generate_dataset_with_viewpoints()
-        generate_dataset_with_vpconfigs()
-    else:
-        generate_dataset()    
+    generate_dataset()    
 
 if __name__ == '__main__':
     main()
