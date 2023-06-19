@@ -117,6 +117,7 @@ class Vertex:
         self.j = self.get_j()
         self.i = self.get_i()
         self.computed = False
+        self.opened = False
 
     def __str__(self):
         return str(self.id) + ' elevation: ' + str(self.elevation) + ' coord: ' + str(self.get_r2_coordinates()) + ' edges: ' + str([x for x in self.edges.keys()]) + str([x for x in self.edges.values()])
@@ -211,6 +212,7 @@ class Vertex:
         self.visited = False
         self.visitedReverse = False
         self.computed = False
+        self.opened = False
 
     def set_local_risk(self, local_risk):
         self.local_risk = local_risk
@@ -421,10 +423,6 @@ def heuristica_padrao(start,goal):
     x2, y2 = goal.get_r2_coordinates()
 
     return r2_distance(x1,x2,y1,y2)
-
-
-
-
 
     
 def calcula_hipotenusa(vertex1,vertex2,g):
@@ -881,9 +879,6 @@ def theta(g, start, goal, v_weight, heuristic):
 
                         opened.append((child, child.get_distance() + r3_heuristic(child, goal))) 
                 
-            
-            
-
 
 def safe_astar(g, start, goal, v_weight, heuristic):
     opened = []
@@ -998,40 +993,26 @@ def astar_correction_factor(g, start, goal, v_weight, heuristic):
 
 
 def astar(g, start, goal, v_weight, heuristic):
-    opened = []
     visited = []
     heuristic_time = 0
-
-    visibility_weight = v_weight
-
-    
     start.set_risk(start.get_local_risk())
     start.set_distance(0)
-
-    
     hscore = start.get_distance() + heuristic(start, goal)
 
     unvisited_queue = [(hscore, start)]
     heapq.heapify(unvisited_queue)
 
     count_visited = 0
-    count_open = 1
-
-    opened.append(start.get_coordinates())
 
     while len(unvisited_queue):
         uv = heapq.heappop(unvisited_queue)
         current = uv[1]
         if current == goal:
-            
-            
             distance = current.get_distance()
             path=[]
             path=backtracking(current,start)
             
-            
-            
-            return visited, len(path), count_open, path, distance
+            return visited, len(path), heuristic_time, path, distance
 
         current.set_visited(True)
         count_visited = count_visited + 1
@@ -1053,8 +1034,7 @@ def astar(g, start, goal, v_weight, heuristic):
 
                 if not next.visited:
                     heapq.heappush(unvisited_queue, (hscore, next))
-                    count_open = count_open + 1
-                    opened.append(next.get_coordinates())
+                    next.opened = True
     
                     
                     
@@ -1159,9 +1139,6 @@ def search(g,current, goal, unvisited_queue, opened, heuristic, bound,visited,co
     
     return False
     
-
-            
-
 
 def generatePath(current, currentReversed, start, goal, expanded, expandedReverse, v_weight, count_open, heuristic,g):
     distance = current.get_distance() + currentReversed.get_distance() + r3_heuristic(current, currentReversed)
@@ -1667,7 +1644,9 @@ def main():
 
     expandingFactors = [4, 8, 16, 32, 64]
 
-    for iteration in range(5):
+    generateImageData = True
+
+    for iteration in range(50):
         for mp in maps:
             i=0
             global map_id
@@ -1684,10 +1663,9 @@ def main():
             print(mp.filename)
             print(mp.id_map)
             g = Graph(mde)
-            viewpoints = observer_points(mde.grid, GRID_ROWS, GRID_COLS, 1)
             print('Gerando os viewsheds')
         
-            paths_per_map = 10_000
+            paths_per_map = 5_000
 
             start_time = time()
             data_io_comp5 = io.StringIO()
@@ -1723,8 +1701,6 @@ def main():
             
             
             for pair in combinations:
-                heuristicTime = 0
-                misses = 0
                 src_coords = pair[0] 
                 dest_coords = pair[1] 
                 source_id = get_id_by_coords(src_coords[0], src_coords[1]) 
@@ -1737,34 +1713,29 @@ def main():
                 global dnn_heuristic_iterative_cf
 
                 for factor in expandingFactors:
+                    heuristicTime = 0
+                    misses = 0
                     expanding_factor = factor
-                
                     dnn_heuristic_iterative = {}
                     dnn_heuristic_iterative_cf = {}
 
                     heuristic = dict_dnn_iterative_abs
                     t5 = time()
-                    opened5, count_visited5, count_open5, visited5, cost5 = astar(g, source, dest, b, heuristic) 
+                    opened, size, heuristic_time, path, distance = astar(g, source, dest, b, heuristic) 
                     t5 = time() - t5
-                    g.reset()
 
-                    
-
-                    '''heuristic = dict_dnn_iterative_cf
-                    t6 = time()
-                    opened6, count_visited6, count_open6, visited6, cost6 = astar_correction_factor(g, source, dest, b, heuristic) 
-                    t6 = time() - t6
-                    g.reset()'''
+                    count_open5 = 0
+                    for vertex in g.get_vertices():
+                        count_open5 = count_open5 + 1 if g.vertices[vertex].opened else count_open5
 
                     usedNodes = count_open5 / len(dnn_heuristic_iterative)
 
-                    data_io_comp5.write("""%s;%s;%s;%s;%s;%s\n""" %(expanding_factor,count_open5,t5,heuristicTime, misses, usedNodes))
-                    # data_io_comp6.write("""%s;%s;%s;%s\n""" %(cost6,t6,count_visited6,count_open6))
+                    data_io_comp5.write("""%s;%s;%s;%s;%s;%s\n""" %(expanding_factor,count_open5,t5,heuristic_time, misses, usedNodes))
 
+                    g.reset()
                     i += 1
 
-            write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_ABS'+str(mp.id_map)+'.csv', data_io_comp5)
-            # write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_CF'+str(mp.id_map)+'.csv', data_io_comp6)         
+            write_dataset_csv('./DADOS_RESULTADOS/A_star_ITERATIVE_ABS'+str(mp.id_map)+'.csv', data_io_comp5) 
 
             print('Tempo: ' + str(time() - start_time) + ' segundos')
 
